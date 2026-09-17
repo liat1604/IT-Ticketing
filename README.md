@@ -37,6 +37,15 @@ A full-stack service-desk ticketing application with a React/Vite client, an Exp
    npm --prefix client run dev
    ```
 
+6. Create or reset the local development administrator:
+
+   ```powershell
+   npm --prefix server run seed:dev
+   ```
+
+   The default credentials from `.env` are `dev.admin@nwu.ac.za` and
+   `Development123!`. Change them locally if needed; `.env` is not committed.
+
 The client is served by Vite and proxies `/api` requests to `http://127.0.0.1:3001`.
 
 ## Build

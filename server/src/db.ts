@@ -1,5 +1,7 @@
-import "dotenv/config";
+import { config } from "dotenv";
 import pg from "pg";
+
+config({ path: new URL("../../.env", import.meta.url) });
 
 const { Pool } = pg;
 
