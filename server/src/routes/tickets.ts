@@ -66,6 +66,22 @@ ticketsRouter.post("/", async (request, response) => {
   try {
     await client.query("BEGIN");
 
+    const categoryResult = await client.query<{ name: string }>(
+      `SELECT name FROM categories WHERE id = $1 AND is_active = TRUE`,
+      [input.categoryId],
+    );
+    const category = categoryResult.rows[0];
+
+    if (!category) {
+      await client.query("ROLLBACK");
+      response.status(400).json({ error: "The selected category is unavailable" });
+      return;
+    }
+
+    const priority = category.name === "Physical Hazard"
+      ? "CRITICAL"
+      : input.priority;
+
     const result = await client.query<{
       id: string;
       ticket_number: string;
@@ -102,7 +118,7 @@ ticketsRouter.post("/", async (request, response) => {
         input.stationReference || null,
         input.title,
         input.description,
-        input.priority,
+        priority,
       ],
     );
 
