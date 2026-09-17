@@ -4,6 +4,9 @@ import express from "express";
 import helmet from "helmet";
 import { pool } from "./db.js";
 import { authRouter } from "./routes/auth.js";
+import { adminRouter } from "./routes/admin.js";
+import { calendarRouter } from "./routes/calendar.js";
+import { portalRouter } from "./routes/portal.js";
 import { ticketsRouter } from "./routes/tickets.js";
 import { technicianRouter } from "./routes/technician.js";
 
@@ -33,6 +36,9 @@ app.get("/api/health", async (_request, response) => {
 });
 
 app.use("/api/auth", authRouter);
+app.use("/api/admin", adminRouter);
+app.use("/api/calendar", calendarRouter);
+app.use("/api/portal", portalRouter);
 app.use("/api/tickets", ticketsRouter);
 app.use("/api/technician", technicianRouter);
 

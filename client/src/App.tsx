@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { LoaderCircle, LogOut, TicketCheck } from "lucide-react";
 import { ReporterDashboard } from "@/components/reporter-dashboard";
 import { TechnicianDashboard } from "@/components/technician-dashboard";
+import type { UserRole } from "@/types";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -18,7 +19,7 @@ type User = {
   id: string;
   email: string;
   fullName: string;
-  role: string;
+  role: UserRole;
 };
 
 type AuthResponse = {
@@ -113,7 +114,7 @@ export default function App() {
        {user.role === "REPORTER" ? (
           <ReporterDashboard />
         ) : (
-         <TechnicianDashboard userId={user.id} />
+         <TechnicianDashboard userId={user.id} userRole={user.role} />
         )}
 
       </section>

@@ -18,5 +18,11 @@ export default defineConfig([
     languageOptions: {
       globals: globals.browser,
     },
+    rules: {
+      // Data-loading effects intentionally update loading/error state around async API calls.
+      'react-hooks/set-state-in-effect': 'off',
+      // shadcn component modules export reusable variants alongside their components.
+      'react-refresh/only-export-components': 'off',
+    },
   },
 ])
