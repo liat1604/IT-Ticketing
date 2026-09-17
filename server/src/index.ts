@@ -9,6 +9,7 @@ import { calendarRouter } from "./routes/calendar.js";
 import { portalRouter } from "./routes/portal.js";
 import { ticketsRouter } from "./routes/tickets.js";
 import { technicianRouter } from "./routes/technician.js";
+import { jobCardsRouter } from "./routes/job-cards.js";
 import { startNotificationMailer } from "./services/notification-mailer.js";
 
 const app = express();
@@ -42,6 +43,7 @@ app.use("/api/calendar", calendarRouter);
 app.use("/api/portal", portalRouter);
 app.use("/api/tickets", ticketsRouter);
 app.use("/api/technician", technicianRouter);
+app.use("/api/job-cards", jobCardsRouter);
 
 const port = Number(process.env.PORT ?? 3001);
 
