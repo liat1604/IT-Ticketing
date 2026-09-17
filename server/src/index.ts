@@ -9,6 +9,7 @@ import { calendarRouter } from "./routes/calendar.js";
 import { portalRouter } from "./routes/portal.js";
 import { ticketsRouter } from "./routes/tickets.js";
 import { technicianRouter } from "./routes/technician.js";
+import { startNotificationMailer } from "./services/notification-mailer.js";
 
 const app = express();
 
@@ -46,4 +47,5 @@ const port = Number(process.env.PORT ?? 3001);
 
 app.listen(port, "127.0.0.1", () => {
   console.log(`API running at http://127.0.0.1:${port}`);
+  startNotificationMailer();
 });

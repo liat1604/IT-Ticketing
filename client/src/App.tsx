@@ -80,7 +80,7 @@ export default function App() {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
             <img
-              src="/ticket-logo.png"
+              src="/ticket-logo.png?v=2"
               alt="CSIS IT Support logo"
               className="h-10 w-auto object-contain"
             />
@@ -181,13 +181,11 @@ function AuthenticationPage({
     <main className="grid min-h-screen lg:grid-cols-2">
       <section className="hidden bg-[#4B2C70] p-12 text-white lg:flex lg:flex-col lg:justify-between">
         <div className="flex items-center gap-3">
-          <div className="rounded-xl bg-white p-2 shadow-sm">
-            <img
-              src="/ticket-logo.png"
-              alt="CSIS IT Support logo"
-              className="h-9 w-auto object-contain"
-            />
-          </div>
+          <img
+            src="/ticket-logo.png?v=2"
+            alt="CSIS IT Support logo"
+            className="size-11 object-contain"
+          />
 
           <div>
             <p className="font-semibold">CSIS IT Support</p>

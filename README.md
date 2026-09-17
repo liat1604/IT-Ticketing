@@ -85,9 +85,12 @@ System administrators can download a password-safe JSON operational snapshot fro
 
 Backups are written under `backups/`, which is excluded from Git. Schedule this script with Windows Task Scheduler for an automated local backup routine.
 
-## Email integration boundary
+## Email notifications
 
-Notification events are written to the persistent `notification_outbox` table. Delivery is deliberately not connected to an external NWU mail relay until authorised SMTP host, sender identity, credentials and data-handling approval are supplied. No ticket contents are transmitted outside the local system by default.
+Notification events are written to the persistent `notification_outbox` table.
+To deliver them through Gmail, set `SMTP_ENABLED=true` and fill in the SMTP
+values in `.env` using a Google app password. Delivery attempts and errors are
+recorded in the outbox; failed messages are retried up to five times.
 
 ## Verification
 
