@@ -187,6 +187,7 @@ ticketsRouter.get("/mine", async (request, response) => {
        FROM tickets
        JOIN categories ON categories.id = tickets.category_id
        WHERE tickets.reporter_id = $1
+         AND tickets.parent_ticket_id IS NULL
        ORDER BY tickets.created_at DESC`,
       [user.id],
     );
