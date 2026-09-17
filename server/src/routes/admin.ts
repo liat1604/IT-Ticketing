@@ -63,51 +63,95 @@ function canManageRole(actor: AuthenticatedUser, targetRole: string, requestedRo
 
 adminRouter.get("/overview", async (request, response) => {
   const period = String(request.query.period ?? "30");
-  const days = period === "365" ? 365 : period === "90" ? 90 : 30;
+  const presetDays = period === "365" ? 365 : period === "90" ? 90 : 30;
+  const fromInput = String(request.query.from ?? "");
+  const toInput = String(request.query.to ?? "");
+  const hasCustomRange = Boolean(fromInput || toInput);
+  if (hasCustomRange && (!/^\d{4}-\d{2}-\d{2}$/.test(fromInput) || !/^\d{4}-\d{2}-\d{2}$/.test(toInput))) {
+    response.status(400).json({ error: "Provide both report dates in YYYY-MM-DD format" });
+    return;
+  }
+  const periodEnd = hasCustomRange
+    ? new Date(`${toInput}T00:00:00.000Z`)
+    : new Date();
+  if (hasCustomRange) periodEnd.setUTCDate(periodEnd.getUTCDate() + 1);
+  const periodStart = hasCustomRange
+    ? new Date(`${fromInput}T00:00:00.000Z`)
+    : new Date(periodEnd.getTime() - presetDays * 86_400_000);
+  if (!Number.isFinite(periodStart.getTime()) || !Number.isFinite(periodEnd.getTime()) || periodStart >= periodEnd) {
+    response.status(400).json({ error: "The report start date must be before the end date" });
+    return;
+  }
+  const days = Math.max(1, Math.ceil((periodEnd.getTime() - periodStart.getTime()) / 86_400_000));
+  const bucket = days <= 45 ? "day" : days <= 180 ? "week" : "month";
 
   try {
-    const [summary, byCategory, byStatus, technicianPerformance, notifications] =
+    const [
+      summary,
+      byCategory,
+      byStatus,
+      technicianPerformance,
+      notifications,
+      resolutionByPriority,
+      resolutionTimeline,
+      backlogAge,
+      sourceBreakdown,
+      subIssueSummary,
+    ] =
       await Promise.all([
         pool.query(
           `SELECT
-             COUNT(*) FILTER (WHERE created_at >= CURRENT_TIMESTAMP - ($1 * INTERVAL '1 day'))::INTEGER
+             COUNT(*) FILTER (WHERE created_at >= $1 AND created_at < $2)::INTEGER
                AS "createdInPeriod",
              COUNT(*) FILTER (
                WHERE status = 'RESOLVED'
-                 AND resolved_at >= CURRENT_TIMESTAMP - ($1 * INTERVAL '1 day')
+                 AND resolved_at >= $1 AND resolved_at < $2
              )::INTEGER AS "resolvedInPeriod",
              COUNT(*) FILTER (WHERE status <> 'RESOLVED')::INTEGER AS "activeTickets",
              COUNT(*) FILTER (WHERE status = 'ESCALATED')::INTEGER AS "escalatedTickets",
              COUNT(*) FILTER (WHERE priority = 'CRITICAL' AND status <> 'RESOLVED')::INTEGER
                AS "criticalTickets",
+             COUNT(*) FILTER (WHERE assigned_to IS NULL AND status <> 'RESOLVED')::INTEGER
+               AS "unassignedTickets",
+             COUNT(*) FILTER (
+               WHERE due_at < CURRENT_TIMESTAMP AND status <> 'RESOLVED'
+             )::INTEGER AS "overdueTargets",
              COALESCE(
                ROUND(AVG(EXTRACT(EPOCH FROM (resolved_at - created_at)))
                  FILTER (
                    WHERE resolved_at IS NOT NULL
-                     AND resolved_at >= CURRENT_TIMESTAMP - ($1 * INTERVAL '1 day')
+                     AND resolved_at >= $1 AND resolved_at < $2
                  ))::INTEGER,
                0
-             ) AS "averageResolutionSeconds"
+             ) AS "averageResolutionSeconds",
+             COALESCE((
+               PERCENTILE_CONT(0.5) WITHIN GROUP (
+                 ORDER BY EXTRACT(EPOCH FROM (resolved_at - created_at))
+               ) FILTER (
+                 WHERE resolved_at IS NOT NULL
+                   AND resolved_at >= $1 AND resolved_at < $2
+               )
+             )::INTEGER, 0) AS "medianResolutionSeconds"
            FROM tickets`,
-          [days],
+          [periodStart, periodEnd],
         ),
         pool.query(
           `SELECT categories.name, COUNT(tickets.id)::INTEGER AS value
            FROM categories
            LEFT JOIN tickets
              ON tickets.category_id = categories.id
-            AND tickets.created_at >= CURRENT_TIMESTAMP - ($1 * INTERVAL '1 day')
+            AND tickets.created_at >= $1 AND tickets.created_at < $2
            GROUP BY categories.id, categories.name
            ORDER BY value DESC, categories.name`,
-          [days],
+          [periodStart, periodEnd],
         ),
         pool.query(
           `SELECT status AS name, COUNT(*)::INTEGER AS value
            FROM tickets
-           WHERE created_at >= CURRENT_TIMESTAMP - ($1 * INTERVAL '1 day')
+           WHERE created_at >= $1 AND created_at < $2
            GROUP BY status
            ORDER BY value DESC`,
-          [days],
+          [periodStart, periodEnd],
         ),
         pool.query(
           `SELECT
@@ -121,7 +165,7 @@ adminRouter.get("/overview", async (request, response) => {
               FROM tickets
               WHERE tickets.assigned_to = users.id
                 AND tickets.status = 'RESOLVED'
-                AND tickets.resolved_at >= CURRENT_TIMESTAMP - ($1 * INTERVAL '1 day'))
+                AND tickets.resolved_at >= $1 AND tickets.resolved_at < $2)
                AS "resolvedTickets",
              (SELECT COALESCE(SUM(
                 EXTRACT(EPOCH FROM (
@@ -131,13 +175,31 @@ adminRouter.get("/overview", async (request, response) => {
               ), 0)::INTEGER
               FROM time_entries
               WHERE time_entries.technician_id = users.id
-                AND time_entries.started_at >= CURRENT_TIMESTAMP - ($1 * INTERVAL '1 day'))
-               AS "workSeconds"
+                AND time_entries.started_at >= $1 AND time_entries.started_at < $2)
+               AS "workSeconds",
+             (SELECT COUNT(DISTINCT time_entries.ticket_id)::INTEGER
+              FROM time_entries
+              WHERE time_entries.technician_id = users.id
+                AND time_entries.started_at >= $1 AND time_entries.started_at < $2)
+               AS "handledTickets",
+             (SELECT COALESCE(ROUND(AVG(EXTRACT(EPOCH FROM (
+                       tickets.resolved_at - tickets.created_at
+                     ))))::INTEGER, 0)
+              FROM tickets
+              WHERE tickets.assigned_to = users.id
+                AND tickets.resolved_at >= $1 AND tickets.resolved_at < $2)
+               AS "averageResolutionSeconds",
+             (SELECT COUNT(*)::INTEGER
+              FROM tickets
+              WHERE tickets.created_by = users.id
+                AND tickets.source = 'WALK_IN'
+                AND tickets.created_at >= $1 AND tickets.created_at < $2)
+               AS "manualTickets"
            FROM users
-           WHERE users.role IN ('TECHNICIAN', 'ADMIN', 'SYSTEM_ADMIN')
+           WHERE users.role = 'TECHNICIAN'
              AND users.is_active = TRUE
            ORDER BY "resolvedTickets" DESC, users.full_name`,
-          [days],
+          [periodStart, periodEnd],
         ),
         pool.query(
           `SELECT
@@ -145,6 +207,104 @@ adminRouter.get("/overview", async (request, response) => {
              COUNT(*) FILTER (WHERE processed_at IS NOT NULL)::INTEGER AS sent,
              COUNT(*) FILTER (WHERE processed_at IS NULL AND attempts > 0)::INTEGER AS failed
            FROM notification_outbox`,
+        ),
+        pool.query(
+          `SELECT
+             priority AS name,
+             COUNT(*)::INTEGER AS "resolvedTickets",
+             COALESCE(ROUND(AVG(EXTRACT(EPOCH FROM (resolved_at - created_at))))::INTEGER, 0)
+               AS "averageResolutionSeconds",
+             COALESCE((PERCENTILE_CONT(0.5) WITHIN GROUP (
+               ORDER BY EXTRACT(EPOCH FROM (resolved_at - created_at))
+             ))::INTEGER, 0) AS "medianResolutionSeconds",
+             COUNT(*) FILTER (
+               WHERE EXTRACT(EPOCH FROM (resolved_at - created_at)) <=
+                 CASE priority
+                   WHEN 'CRITICAL' THEN 14400
+                   WHEN 'HIGH' THEN 86400
+                   WHEN 'MEDIUM' THEN 259200
+                   WHEN 'LOW' THEN 432000
+                 END
+             )::INTEGER AS "withinTarget",
+             CASE priority
+               WHEN 'CRITICAL' THEN 14400
+               WHEN 'HIGH' THEN 86400
+               WHEN 'MEDIUM' THEN 259200
+               WHEN 'LOW' THEN 432000
+             END AS "targetSeconds"
+           FROM tickets
+           WHERE resolved_at >= $1 AND resolved_at < $2
+           GROUP BY priority
+           ORDER BY CASE priority
+             WHEN 'CRITICAL' THEN 1
+             WHEN 'HIGH' THEN 2
+             WHEN 'MEDIUM' THEN 3
+             WHEN 'LOW' THEN 4
+           END`,
+          [periodStart, periodEnd],
+        ),
+        pool.query(
+          `WITH activity AS (
+             SELECT date_trunc($3::text, created_at) AS period, 1 AS created, 0 AS resolved
+             FROM tickets
+             WHERE created_at >= $1 AND created_at < $2
+             UNION ALL
+             SELECT date_trunc($3::text, resolved_at) AS period, 0 AS created, 1 AS resolved
+             FROM tickets
+             WHERE resolved_at >= $1 AND resolved_at < $2
+           )
+           SELECT period AS label,
+                  SUM(created)::INTEGER AS created,
+                  SUM(resolved)::INTEGER AS resolved
+           FROM activity
+           GROUP BY period
+           ORDER BY period`,
+          [periodStart, periodEnd, bucket],
+        ),
+        pool.query(
+          `SELECT name, value
+           FROM (
+             SELECT
+               CASE
+                 WHEN CURRENT_TIMESTAMP - created_at < INTERVAL '2 days' THEN '0–2 days'
+                 WHEN CURRENT_TIMESTAMP - created_at < INTERVAL '7 days' THEN '3–7 days'
+                 WHEN CURRENT_TIMESTAMP - created_at < INTERVAL '14 days' THEN '8–14 days'
+                 ELSE '15+ days'
+               END AS name,
+               CASE
+                 WHEN CURRENT_TIMESTAMP - created_at < INTERVAL '2 days' THEN 1
+                 WHEN CURRENT_TIMESTAMP - created_at < INTERVAL '7 days' THEN 2
+                 WHEN CURRENT_TIMESTAMP - created_at < INTERVAL '14 days' THEN 3
+                 ELSE 4
+               END AS sort_order,
+               COUNT(*)::INTEGER AS value
+             FROM tickets
+             WHERE status <> 'RESOLVED'
+             GROUP BY name, sort_order
+           ) AS ageing
+           ORDER BY sort_order`,
+        ),
+        pool.query(
+          `SELECT source AS name, COUNT(*)::INTEGER AS value
+           FROM tickets
+           WHERE created_at >= $1 AND created_at < $2
+           GROUP BY source
+           ORDER BY value DESC`,
+          [periodStart, periodEnd],
+        ),
+        pool.query(
+          `SELECT
+             COUNT(DISTINCT parent_ticket_id) FILTER (
+               WHERE parent_ticket_id IS NOT NULL
+             )::INTEGER AS "parentsWithSubIssues",
+             COUNT(*) FILTER (WHERE parent_ticket_id IS NOT NULL)::INTEGER AS "totalSubIssues",
+             COUNT(*) FILTER (
+               WHERE parent_ticket_id IS NOT NULL AND status = 'RESOLVED'
+             )::INTEGER AS "resolvedSubIssues",
+             COUNT(*) FILTER (
+               WHERE due_at < CURRENT_TIMESTAMP AND status <> 'RESOLVED'
+             )::INTEGER AS "overdueWorkItems"
+           FROM tickets`,
         ),
       ]);
 
@@ -154,6 +314,8 @@ adminRouter.get("/overview", async (request, response) => {
 
     response.json({
       periodDays: days,
+      periodStart: periodStart.toISOString(),
+      periodEnd: new Date(periodEnd.getTime() - 1).toISOString(),
       metrics: {
         ...metrics,
         resolutionRate: created === 0 ? 0 : Math.round((resolved / created) * 100),
@@ -162,6 +324,11 @@ adminRouter.get("/overview", async (request, response) => {
       byStatus: byStatus.rows,
       technicianPerformance: technicianPerformance.rows,
       notifications: notifications.rows[0],
+      resolutionByPriority: resolutionByPriority.rows,
+      resolutionTimeline: resolutionTimeline.rows,
+      backlogAge: backlogAge.rows,
+      sourceBreakdown: sourceBreakdown.rows,
+      subIssueSummary: subIssueSummary.rows[0],
     });
   } catch (error) {
     console.error("Could not load administrator overview", error);
@@ -511,7 +678,21 @@ adminRouter.get("/audit", async (request, response) => {
   }
 });
 
-adminRouter.get("/reports/tickets.csv", async (_request, response) => {
+adminRouter.get("/reports/tickets.csv", async (request, response) => {
+  const fromInput = String(request.query.from ?? "");
+  const toInput = String(request.query.to ?? "");
+  const hasCustomRange = Boolean(fromInput || toInput);
+  if (hasCustomRange && (!/^\d{4}-\d{2}-\d{2}$/.test(fromInput) || !/^\d{4}-\d{2}-\d{2}$/.test(toInput))) {
+    response.status(400).json({ error: "Provide both report dates in YYYY-MM-DD format" });
+    return;
+  }
+  const rangeStart = hasCustomRange ? new Date(`${fromInput}T00:00:00.000Z`) : null;
+  const rangeEnd = hasCustomRange ? new Date(`${toInput}T00:00:00.000Z`) : null;
+  if (rangeEnd) rangeEnd.setUTCDate(rangeEnd.getUTCDate() + 1);
+  if (rangeStart && rangeEnd && rangeStart >= rangeEnd) {
+    response.status(400).json({ error: "The report start date must be before the end date" });
+    return;
+  }
   try {
     const result = await pool.query<{
       ticket_number: string;
@@ -546,7 +727,9 @@ adminRouter.get("/reports/tickets.csv", async (_request, response) => {
        JOIN users AS reporters ON reporters.id = tickets.reporter_id
        LEFT JOIN users AS technicians ON technicians.id = tickets.assigned_to
        LEFT JOIN tickets AS parent ON parent.id = tickets.parent_ticket_id
+       ${hasCustomRange ? "WHERE tickets.created_at >= $1 AND tickets.created_at < $2" : ""}
        ORDER BY tickets.created_at DESC`,
+      hasCustomRange ? [rangeStart, rangeEnd] : [],
     );
 
     const header = [
@@ -590,6 +773,90 @@ adminRouter.get("/reports/tickets.csv", async (_request, response) => {
   } catch (error) {
     console.error("Could not export ticket report", error);
     response.status(500).json({ error: "Could not export ticket report" });
+  }
+});
+
+adminRouter.get("/reports/technicians.csv", async (request, response) => {
+  const fromInput = String(request.query.from ?? "");
+  const toInput = String(request.query.to ?? "");
+  const hasCustomRange = Boolean(fromInput || toInput);
+  if (hasCustomRange && (!/^\d{4}-\d{2}-\d{2}$/.test(fromInput) || !/^\d{4}-\d{2}-\d{2}$/.test(toInput))) {
+    response.status(400).json({ error: "Provide both report dates in YYYY-MM-DD format" });
+    return;
+  }
+  const end = hasCustomRange ? new Date(`${toInput}T00:00:00.000Z`) : new Date();
+  if (hasCustomRange) end.setUTCDate(end.getUTCDate() + 1);
+  const start = hasCustomRange ? new Date(`${fromInput}T00:00:00.000Z`) : new Date(end.getTime() - 30 * 86_400_000);
+  if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || start >= end) {
+    response.status(400).json({ error: "The report start date must be before the end date" });
+    return;
+  }
+
+  try {
+    const result = await pool.query<{
+      full_name: string;
+      active_tickets: number;
+      handled_tickets: number;
+      resolved_tickets: number;
+      manual_tickets: number;
+      work_seconds: number;
+      average_resolution_seconds: number;
+    }>(
+      `SELECT
+         users.full_name,
+         (SELECT COUNT(*)::INTEGER FROM tickets
+          WHERE tickets.assigned_to = users.id AND tickets.status <> 'RESOLVED') AS active_tickets,
+         (SELECT COUNT(DISTINCT time_entries.ticket_id)::INTEGER FROM time_entries
+          WHERE time_entries.technician_id = users.id
+            AND time_entries.started_at >= $1 AND time_entries.started_at < $2) AS handled_tickets,
+         (SELECT COUNT(*)::INTEGER FROM tickets
+          WHERE tickets.assigned_to = users.id
+            AND tickets.resolved_at >= $1 AND tickets.resolved_at < $2) AS resolved_tickets,
+         (SELECT COUNT(*)::INTEGER FROM tickets
+          WHERE tickets.created_by = users.id AND tickets.source = 'WALK_IN'
+            AND tickets.created_at >= $1 AND tickets.created_at < $2) AS manual_tickets,
+         (SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (
+             COALESCE(time_entries.stopped_at, CURRENT_TIMESTAMP) - time_entries.started_at
+           ))), 0)::INTEGER FROM time_entries
+          WHERE time_entries.technician_id = users.id
+            AND time_entries.started_at >= $1 AND time_entries.started_at < $2) AS work_seconds,
+         (SELECT COALESCE(ROUND(AVG(EXTRACT(EPOCH FROM (
+             tickets.resolved_at - tickets.created_at
+           ))))::INTEGER, 0) FROM tickets
+          WHERE tickets.assigned_to = users.id
+            AND tickets.resolved_at >= $1 AND tickets.resolved_at < $2) AS average_resolution_seconds
+       FROM users
+       WHERE users.role = 'TECHNICIAN' AND users.is_active = TRUE
+       ORDER BY resolved_tickets DESC, users.full_name`,
+      [start, end],
+    );
+
+    const header = [
+      "Technician", "Active Tickets", "Handled Tickets", "Resolved Tickets",
+      "Walk-in Tickets", "Recorded Work Seconds", "Average Resolution Seconds",
+      "Period Start", "Period End",
+    ];
+    const rows = result.rows.map((row) => [
+      row.full_name,
+      row.active_tickets,
+      row.handled_tickets,
+      row.resolved_tickets,
+      row.manual_tickets,
+      row.work_seconds,
+      row.average_resolution_seconds,
+      start.toISOString(),
+      new Date(end.getTime() - 1).toISOString(),
+    ]);
+    const csv = [header, ...rows].map((row) => row.map(csvCell).join(",")).join("\r\n");
+    response.setHeader("Content-Type", "text/csv; charset=utf-8");
+    response.setHeader(
+      "Content-Disposition",
+      `attachment; filename="csis-technician-report-${new Date().toISOString().slice(0, 10)}.csv"`,
+    );
+    response.send(`\uFEFF${csv}`);
+  } catch (error) {
+    console.error("Could not export technician report", error);
+    response.status(500).json({ error: "Could not export technician report" });
   }
 });
 

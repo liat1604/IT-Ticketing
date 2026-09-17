@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { Activity, BarChart3, DatabaseBackup, Download, Eye, LoaderCircle, Plus, RefreshCw, Search, ShieldCheck, TicketCheck, UserCog } from "lucide-react";
+import { Activity, AlertTriangle, BarChart3, CalendarRange, DatabaseBackup, Download, Eye, GitBranch, LoaderCircle, Plus, RefreshCw, Search, ShieldCheck, TicketCheck, Timer, UserCog } from "lucide-react";
 
 import { api, formatDuration, formatValue, relativeTime } from "@/lib/api";
 import type { PortalSection, User, UserRole } from "@/types";
@@ -13,10 +13,17 @@ import { Label } from "@/components/ui/label";
 
 type Overview = {
   periodDays: number;
-  metrics: { createdInPeriod: number; resolvedInPeriod: number; activeTickets: number; escalatedTickets: number; criticalTickets: number; averageResolutionSeconds: number; resolutionRate: number };
+  periodStart: string;
+  periodEnd: string;
+  metrics: { createdInPeriod: number; resolvedInPeriod: number; activeTickets: number; escalatedTickets: number; criticalTickets: number; unassignedTickets: number; overdueTargets: number; averageResolutionSeconds: number; medianResolutionSeconds: number; resolutionRate: number };
   byCategory: Array<{ name: string; value: number }>;
   byStatus: Array<{ name: string; value: number }>;
-  technicianPerformance: Array<{ id: string; fullName: string; activeTickets: number; resolvedTickets: number; workSeconds: number }>;
+  technicianPerformance: Array<{ id: string; fullName: string; activeTickets: number; resolvedTickets: number; workSeconds: number; handledTickets: number; averageResolutionSeconds: number; manualTickets: number }>;
+  resolutionByPriority: Array<{ name: string; resolvedTickets: number; averageResolutionSeconds: number; medianResolutionSeconds: number; withinTarget: number; targetSeconds: number }>;
+  resolutionTimeline: Array<{ label: string; created: number; resolved: number }>;
+  backlogAge: Array<{ name: string; value: number }>;
+  sourceBreakdown: Array<{ name: string; value: number }>;
+  subIssueSummary: { parentsWithSubIssues: number; totalSubIssues: number; resolvedSubIssues: number; overdueWorkItems: number };
   notifications: { pending: number; sent: number; failed: number };
 };
 type AdminTicket = { id: string; ticketNumber: string; title: string; priority: string; status: string; source: string; category: string; reporterName: string; reporterEmail: string; technicianName: string | null; parentTicketNumber: string | null; dueAt: string | null; createdAt: string };
@@ -33,25 +40,81 @@ export function AdminDashboard({ section, user }: { section: PortalSection; user
 
 function ReportsOverview({ showReportHeading, role }: { showReportHeading: boolean; role: UserRole }) {
   const [period, setPeriod] = useState("30");
+  const [range, setRange] = useState(() => dateRangeFor(30));
   const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const load = useCallback(async () => { setLoading(true); setError(""); try { setData(await api<Overview>(`/api/admin/overview?period=${period}`)); } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not load reports"); } finally { setLoading(false); } }, [period]);
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const params = new URLSearchParams({ from: range.from, to: range.to });
+      setData(await api<Overview>(`/api/admin/overview?${params}`));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not load reports");
+    } finally {
+      setLoading(false);
+    }
+  }, [range]);
   useEffect(() => { void load(); }, [load]);
+
+  function selectPeriod(value: string) {
+    setPeriod(value);
+    if (value !== "custom") setRange(dateRangeFor(Number(value)));
+  }
+
+  function updateDate(key: "from" | "to", value: string) {
+    setPeriod("custom");
+    setRange((current) => ({ ...current, [key]: value }));
+  }
+
+  function reportUrl(path: string) {
+    return `${path}?${new URLSearchParams({ from: range.from, to: range.to })}`;
+  }
+
   if (loading && !data) return <LoadingPanel label="Loading operational reporting" />;
   const maximum = Math.max(1, ...(data?.byCategory.map((item) => item.value) ?? []));
   return <div className="space-y-6">
-    <div className="flex flex-wrap items-center justify-between gap-4"><div><h1 className="text-2xl font-semibold tracking-tight">{showReportHeading ? "Reports and analytics" : "Operational overview"}</h1><p className="text-sm text-muted-foreground">Live service data from PostgreSQL—not demonstration values.</p></div><div className="flex gap-2"><select value={period} onChange={(event) => setPeriod(event.target.value)} className={selectClasses}><option value="30">Last 30 days</option><option value="90">Last 90 days</option><option value="365">Last year</option></select><Button variant="outline" onClick={() => download("/api/admin/reports/tickets.csv")}><Download /> CSV</Button></div></div>
+    <div><h1 className="text-2xl font-semibold tracking-tight">{showReportHeading ? "Reports and analytics" : "Operational overview"}</h1><p className="text-sm text-muted-foreground">Live service data from PostgreSQL—not demonstration values.</p></div>
+    <Card>
+      <CardContent className="grid gap-4 pt-6 xl:grid-cols-[190px_170px_170px_1fr] xl:items-end">
+        <Field label="Period"><select value={period} onChange={(event) => selectPeriod(event.target.value)} className={`${selectClasses} w-full`}><option value="30">Last 30 days</option><option value="90">Last 90 days</option><option value="365">Last year</option><option value="custom">Custom dates</option></select></Field>
+        <Field label="From"><Input type="date" value={range.from} max={range.to} onChange={(event) => updateDate("from", event.target.value)} /></Field>
+        <Field label="To"><Input type="date" value={range.to} min={range.from} max={todayDateInput()} onChange={(event) => updateDate("to", event.target.value)} /></Field>
+        <div className="flex flex-wrap gap-2 xl:justify-end"><Button variant="outline" disabled={!data} onClick={() => data && downloadSummaryReport(data)}><Download /> Summary CSV</Button><Button variant="outline" disabled={!range.from || !range.to} onClick={() => download(reportUrl("/api/admin/reports/tickets.csv"))}><Download /> Ticket CSV</Button><Button variant="outline" disabled={!range.from || !range.to} onClick={() => download(reportUrl("/api/admin/reports/technicians.csv"))}><Download /> Technician CSV</Button><Button variant="outline" onClick={() => void load()} disabled={loading}><RefreshCw className={loading ? "animate-spin" : ""} /> Refresh</Button></div>
+      </CardContent>
+    </Card>
     {error && <ErrorMessage>{error}</ErrorMessage>}
     {data && <>
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric label="Active tickets" value={data.metrics.activeTickets} icon={<TicketCheck />} /><Metric label={`Resolved (${data.periodDays}d)`} value={data.metrics.resolvedInPeriod} icon={<ShieldCheck />} /><Metric label="Resolution rate" value={`${data.metrics.resolutionRate}%`} icon={<BarChart3 />} /><Metric label="Average resolution" value={formatDuration(data.metrics.averageResolutionSeconds)} icon={<Activity />} /></section>
+      <p className="flex items-center gap-2 text-sm text-muted-foreground"><CalendarRange className="size-4" /> Reporting on {formatReportDate(data.periodStart)} to {formatReportDate(data.periodEnd)} ({data.periodDays} days)</p>
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric label="Current active tickets" value={data.metrics.activeTickets} icon={<TicketCheck />} /><Metric label="Created in period" value={data.metrics.createdInPeriod} icon={<Plus />} /><Metric label="Resolved in period" value={data.metrics.resolvedInPeriod} icon={<ShieldCheck />} /><Metric label="Average resolution" value={formatDuration(data.metrics.averageResolutionSeconds)} icon={<Activity />} /></section>
+      {showReportHeading && <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric label="Median resolution" value={formatDuration(data.metrics.medianResolutionSeconds)} icon={<Timer />} /><Metric label="Resolution rate" value={`${data.metrics.resolutionRate}%`} icon={<BarChart3 />} /><Metric label="Unassigned tickets" value={data.metrics.unassignedTickets} icon={<AlertTriangle />} /><Metric label="Overdue targets" value={data.metrics.overdueTargets} icon={<CalendarRange />} /></section>}
       <div className="grid gap-6 xl:grid-cols-2">
         <Card><CardHeader><CardTitle>Tickets by category</CardTitle><CardDescription>Requests created during the selected period</CardDescription></CardHeader><CardContent className="space-y-4">{data.byCategory.map((item) => <div key={item.name}><div className="mb-1 flex justify-between text-sm"><span>{item.name}</span><span className="font-semibold">{item.value}</span></div><div className="h-2.5 rounded-full bg-slate-100"><div className="h-2.5 rounded-full bg-[#4B2C70]" style={{ width: `${(item.value / maximum) * 100}%` }} /></div></div>)}</CardContent></Card>
-        <Card><CardHeader><CardTitle>Status distribution</CardTitle><CardDescription>Current workload and completed work</CardDescription></CardHeader><CardContent className="grid gap-3 sm:grid-cols-2">{data.byStatus.map((item) => <div key={item.name} className="rounded-xl border p-4"><p className="text-sm text-muted-foreground">{formatValue(item.name)}</p><p className="mt-1 text-2xl font-semibold">{item.value}</p></div>)}</CardContent></Card>
+        <Card><CardHeader><CardTitle>Status distribution</CardTitle><CardDescription>Current status of tickets created in the selected period</CardDescription></CardHeader><CardContent className="grid gap-3 sm:grid-cols-2">{data.byStatus.map((item) => <div key={item.name} className="rounded-xl border p-4"><p className="text-sm text-muted-foreground">{formatValue(item.name)}</p><p className="mt-1 text-2xl font-semibold">{item.value}</p></div>)}</CardContent></Card>
       </div>
-      <Card><CardHeader><CardTitle>Technician performance</CardTitle><CardDescription>Assigned work, resolutions and recorded job-card time</CardDescription></CardHeader><CardContent><ResponsiveTable headings={["Technician","Active","Resolved","Recorded time"]}>{data.technicianPerformance.map((person) => <tr key={person.id} className="border-t"><td className="px-4 py-3 font-medium">{person.fullName}</td><td className="px-4 py-3">{person.activeTickets}</td><td className="px-4 py-3">{person.resolvedTickets}</td><td className="px-4 py-3">{formatDuration(person.workSeconds)}</td></tr>)}</ResponsiveTable></CardContent></Card>
+      <Card><CardHeader><CardTitle>Technician performance</CardTitle><CardDescription>Work handled during the selected period; active is the technician's current queue.</CardDescription></CardHeader><CardContent><ResponsiveTable headings={["Technician","Active","Handled","Resolved","Walk-ins","Recorded time","Avg. resolution"]}>{data.technicianPerformance.map((person) => <tr key={person.id} className="border-t"><td className="px-4 py-3 font-medium">{person.fullName}</td><td className="px-4 py-3">{person.activeTickets}</td><td className="px-4 py-3">{person.handledTickets}</td><td className="px-4 py-3">{person.resolvedTickets}</td><td className="px-4 py-3">{person.manualTickets}</td><td className="whitespace-nowrap px-4 py-3">{formatDuration(person.workSeconds)}</td><td className="whitespace-nowrap px-4 py-3">{person.resolvedTickets ? formatDuration(person.averageResolutionSeconds) : "—"}</td></tr>)}</ResponsiveTable></CardContent></Card>
+      {showReportHeading && <ExtendedReports data={data} />}
       {role === "SYSTEM_ADMIN" && <Card><CardHeader><CardTitle>Notification outbox</CardTitle><CardDescription>Persistent email delivery queue health</CardDescription></CardHeader><CardContent className="grid gap-3 sm:grid-cols-3"><SmallStat label="Pending" value={data.notifications.pending} /><SmallStat label="Processed" value={data.notifications.sent} /><SmallStat label="Retry needed" value={data.notifications.failed} /></CardContent></Card>}
     </>}
+  </div>;
+}
+
+function ExtendedReports({ data }: { data: Overview }) {
+  const timelineMaximum = Math.max(1, ...data.resolutionTimeline.flatMap((item) => [item.created, item.resolved]));
+  const backlogMaximum = Math.max(1, ...data.backlogAge.map((item) => item.value));
+  const sourceMaximum = Math.max(1, ...data.sourceBreakdown.map((item) => item.value));
+  const completedSubIssues = data.subIssueSummary.totalSubIssues === 0 ? 0 : Math.round((data.subIssueSummary.resolvedSubIssues / data.subIssueSummary.totalSubIssues) * 100);
+
+  return <div className="space-y-6">
+    <Card><CardHeader><CardTitle>Ticket flow over time</CardTitle><CardDescription>Created versus resolved tickets in each reporting bucket.</CardDescription></CardHeader><CardContent>{data.resolutionTimeline.length === 0 ? <EmptyReport /> : <div className="space-y-4">{data.resolutionTimeline.map((item) => <div key={item.label} className="grid gap-2 sm:grid-cols-[120px_1fr]"><p className="text-sm font-medium">{formatTimelineLabel(item.label, data.periodDays)}</p><div className="space-y-1.5"><ReportBar label="Created" value={item.created} maximum={timelineMaximum} className="bg-[#4B2C70]" /><ReportBar label="Resolved" value={item.resolved} maximum={timelineMaximum} className="bg-emerald-500" /></div></div>)}</div>}</CardContent></Card>
+    <Card><CardHeader><CardTitle>Resolution time and service targets</CardTitle><CardDescription>Elapsed time from ticket creation to resolution, compared with operational priority targets.</CardDescription></CardHeader><CardContent>{data.resolutionByPriority.length === 0 ? <EmptyReport /> : <ResponsiveTable headings={["Priority","Target","Resolved","Average","Median","Within target"]}>{data.resolutionByPriority.map((item) => { const percentage = item.resolvedTickets === 0 ? 0 : Math.round((item.withinTarget / item.resolvedTickets) * 100); return <tr key={item.name} className="border-t"><td className="px-4 py-3"><Priority priority={item.name} /></td><td className="px-4 py-3">{formatDuration(item.targetSeconds)}</td><td className="px-4 py-3">{item.resolvedTickets}</td><td className="px-4 py-3">{formatDuration(item.averageResolutionSeconds)}</td><td className="px-4 py-3">{formatDuration(item.medianResolutionSeconds)}</td><td className="px-4 py-3"><span className={percentage >= 80 ? "text-emerald-700" : percentage >= 50 ? "text-amber-700" : "text-red-700"}>{item.withinTarget} ({percentage}%)</span></td></tr>; })}</ResponsiveTable>}</CardContent></Card>
+    <div className="grid gap-6 xl:grid-cols-2">
+      <Card><CardHeader><CardTitle>Current backlog age</CardTitle><CardDescription>Open tickets grouped by how long they have been waiting.</CardDescription></CardHeader><CardContent className="space-y-4">{data.backlogAge.length === 0 ? <EmptyReport /> : data.backlogAge.map((item) => <ReportBar key={item.name} label={item.name} value={item.value} maximum={backlogMaximum} className={item.name === "15+ days" ? "bg-red-500" : "bg-amber-500"} />)}</CardContent></Card>
+      <Card><CardHeader><CardTitle>Ticket source</CardTitle><CardDescription>How tickets entered the system during this period.</CardDescription></CardHeader><CardContent className="space-y-4">{data.sourceBreakdown.length === 0 ? <EmptyReport /> : data.sourceBreakdown.map((item) => <ReportBar key={item.name} label={formatValue(item.name)} value={item.value} maximum={sourceMaximum} className="bg-sky-500" />)}</CardContent></Card>
+    </div>
+    <Card><CardHeader><CardTitle className="flex items-center gap-2"><GitBranch className="text-[#4B2C70]" /> Sub-issue delivery</CardTitle><CardDescription>Progress on larger tickets that were divided into technician work items.</CardDescription></CardHeader><CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><SmallStat label="Parent tickets" value={data.subIssueSummary.parentsWithSubIssues} /><SmallStat label="Total sub-issues" value={data.subIssueSummary.totalSubIssues} /><SmallStat label={`Resolved (${completedSubIssues}%)`} value={data.subIssueSummary.resolvedSubIssues} /><SmallStat label="Overdue work items" value={data.subIssueSummary.overdueWorkItems} /></CardContent></Card>
+    <Card><CardHeader><CardTitle>Operational attention</CardTitle><CardDescription>Current queue risks that may need administrator action.</CardDescription></CardHeader><CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><SmallStat label="Escalated" value={data.metrics.escalatedTickets} /><SmallStat label="Critical open" value={data.metrics.criticalTickets} /><SmallStat label="Unassigned" value={data.metrics.unassignedTickets} /><SmallStat label="Overdue targets" value={data.metrics.overdueTargets} /></CardContent></Card>
   </div>;
 }
 
@@ -91,6 +154,8 @@ function SystemAdministration({ role }: { role: UserRole }) {
 
 function Metric({ label, value, icon }: { label: string; value: string | number; icon: ReactNode }) { return <Card><CardContent className="flex items-center justify-between py-1"><div><p className="text-sm text-muted-foreground">{label}</p><p className="mt-1 text-2xl font-semibold">{value}</p></div><div className="rounded-xl bg-purple-50 p-3 text-[#4B2C70]">{icon}</div></CardContent></Card>; }
 function SmallStat({ label, value }: { label: string; value: number }) { return <div className="rounded-xl border p-4"><p className="text-sm text-muted-foreground">{label}</p><p className="mt-1 text-2xl font-semibold">{value}</p></div>; }
+function ReportBar({ label, value, maximum, className }: { label: string; value: number; maximum: number; className: string }) { return <div><div className="mb-1 flex items-center justify-between gap-3 text-sm"><span className="text-muted-foreground">{label}</span><span className="font-semibold">{value}</span></div><div className="h-2.5 overflow-hidden rounded-full bg-slate-100"><div className={`h-full rounded-full ${className}`} style={{ width: `${value === 0 ? 0 : Math.max(4, (value / maximum) * 100)}%` }} /></div></div>; }
+function EmptyReport() { return <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">No data was recorded for this period.</p>; }
 function LoadingPanel({ label }: { label: string }) { return <div className="flex min-h-56 items-center justify-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="animate-spin" /> {label}</div>; }
 function ErrorMessage({ children }: { children: ReactNode }) { return <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{children}</p>; }
 function Field({ label, children }: { label: string; children: ReactNode }) { return <div className="space-y-2"><Label>{label}</Label>{children}</div>; }
@@ -99,4 +164,47 @@ function Priority({ priority }: { priority: string }) { return <Badge className=
 function Filter({ value, onChange, values }: { value: string; onChange: (value: string) => void; values: string[] }) { return <select value={value} onChange={(event) => onChange(event.target.value)} className={selectClasses}><option value="ALL">All</option>{values.map((item) => <option key={item} value={item}>{formatValue(item)}</option>)}</select>; }
 function summariseChange(value: Record<string, unknown> | null) { if (!value) return "—"; return Object.entries(value).slice(0, 4).map(([key, item]) => `${formatValue(key)}: ${String(item)}`).join(" · "); }
 function download(url: string) { const anchor = document.createElement("a"); anchor.href = url; anchor.download = ""; document.body.appendChild(anchor); anchor.click(); anchor.remove(); }
+function downloadSummaryReport(data: Overview) {
+  const rows: Array<Array<string | number>> = [
+    ["Section", "Item", "Value", "Detail"],
+    ["Report period", "Start date", data.periodStart.slice(0, 10), ""],
+    ["Report period", "End date", data.periodEnd.slice(0, 10), `${data.periodDays} days`],
+    ["Headline", "Created tickets", data.metrics.createdInPeriod, ""],
+    ["Headline", "Resolved tickets", data.metrics.resolvedInPeriod, ""],
+    ["Headline", "Current active tickets", data.metrics.activeTickets, ""],
+    ["Headline", "Resolution rate", `${data.metrics.resolutionRate}%`, ""],
+    ["Headline", "Average resolution seconds", data.metrics.averageResolutionSeconds, formatDuration(data.metrics.averageResolutionSeconds)],
+    ["Headline", "Median resolution seconds", data.metrics.medianResolutionSeconds, formatDuration(data.metrics.medianResolutionSeconds)],
+    ["Operational attention", "Escalated", data.metrics.escalatedTickets, ""],
+    ["Operational attention", "Critical open", data.metrics.criticalTickets, ""],
+    ["Operational attention", "Unassigned", data.metrics.unassignedTickets, ""],
+    ["Operational attention", "Overdue targets", data.metrics.overdueTargets, ""],
+    ...data.byCategory.map((item) => ["Category", item.name, item.value, ""] as Array<string | number>),
+    ...data.byStatus.map((item) => ["Status", formatValue(item.name), item.value, ""] as Array<string | number>),
+    ...data.technicianPerformance.map((item) => ["Technician", item.fullName, item.resolvedTickets, `Active ${item.activeTickets}; handled ${item.handledTickets}; walk-ins ${item.manualTickets}; recorded ${item.workSeconds}s; average resolution ${item.averageResolutionSeconds}s`] as Array<string | number>),
+    ...data.resolutionByPriority.map((item) => ["Priority resolution", formatValue(item.name), item.resolvedTickets, `Target ${item.targetSeconds}s; average ${item.averageResolutionSeconds}s; median ${item.medianResolutionSeconds}s; within target ${item.withinTarget}`] as Array<string | number>),
+    ...data.resolutionTimeline.map((item) => ["Ticket flow", item.label.slice(0, 10), item.created, `Resolved ${item.resolved}`] as Array<string | number>),
+    ...data.backlogAge.map((item) => ["Backlog age", item.name, item.value, ""] as Array<string | number>),
+    ...data.sourceBreakdown.map((item) => ["Ticket source", formatValue(item.name), item.value, ""] as Array<string | number>),
+    ["Sub-issues", "Parent tickets", data.subIssueSummary.parentsWithSubIssues, ""],
+    ["Sub-issues", "Total sub-issues", data.subIssueSummary.totalSubIssues, ""],
+    ["Sub-issues", "Resolved sub-issues", data.subIssueSummary.resolvedSubIssues, ""],
+    ["Sub-issues", "Overdue work items", data.subIssueSummary.overdueWorkItems, ""],
+  ];
+  const csv = rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
+  const url = URL.createObjectURL(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" }));
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `csis-report-summary-${data.periodStart.slice(0, 10)}-to-${data.periodEnd.slice(0, 10)}.csv`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+function csvCell(value: string | number) { return `"${String(value).replaceAll('"', '""')}"`; }
+function dateInputValue(date: Date) { const year = date.getFullYear(); const month = String(date.getMonth() + 1).padStart(2, "0"); const day = String(date.getDate()).padStart(2, "0"); return `${year}-${month}-${day}`; }
+function todayDateInput() { return dateInputValue(new Date()); }
+function dateRangeFor(days: number) { const end = new Date(); const start = new Date(end); start.setDate(start.getDate() - Math.max(0, days - 1)); return { from: dateInputValue(start), to: dateInputValue(end) }; }
+function formatReportDate(value: string) { const [year, month, day] = value.slice(0, 10).split("-").map(Number); return new Date(year, month - 1, day).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }); }
+function formatTimelineLabel(value: string, periodDays: number) { return new Date(value).toLocaleDateString(undefined, periodDays > 180 ? { month: "short", year: "numeric" } : { day: "numeric", month: "short" }); }
 const selectClasses = "h-10 rounded-lg border border-input bg-white px-3 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/50";
