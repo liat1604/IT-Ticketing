@@ -155,3 +155,28 @@ python .\scripts\generate-user-guide.py
 ```
 
 The generated file is written to `output/pdf/csis-it-support-user-guide.pdf`.
+
+## Signup email verification
+
+New self-registered and administrator-created accounts must verify their email
+before signing in or accessing ticket APIs. Signup queues a verification email
+and does not create a session. Links expire in 24 hours and are single-use;
+users can request another from **Resend verification email** on the sign-in page.
+Password resets do not bypass email verification.
+
+Apply migrations 006, 007 and 008 after the earlier migrations, before starting
+the updated server. Apply 008 once: it preserves access for existing accounts.
+New accounts default to unverified. Development seeds and the system-admin
+bootstrap explicitly provision trusted accounts with access.
+
+```powershell
+Get-Content -LiteralPath ".\server\db\migrations\006_ticket_started_notification.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
+Get-Content -LiteralPath ".\server\db\migrations\007_password_resets.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
+Get-Content -LiteralPath ".\server\db\migrations\008_email_verification.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
+```
+
+Set `APP_BASE_URL` to the externally accessible frontend URL and configure
+`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` and `MAIL_FROM` in `.env`.
+The API's existing notification worker delivers verification emails through SMTP.
+Without SMTP configuration, emails remain queued and new users cannot verify.
+Run `npm --prefix server test` for the authentication integration tests.

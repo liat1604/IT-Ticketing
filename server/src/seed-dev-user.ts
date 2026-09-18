@@ -22,8 +22,8 @@ const passwordHash = await hash(password, 12);
 const technicianPasswordHash = await hash(technicianPassword, 12);
 
 await pool.query(
-  `INSERT INTO users (email, full_name, password_hash, role, is_active)
-   VALUES ($1, 'Development Administrator', $2, 'ADMIN', TRUE)
+  `INSERT INTO users (email, full_name, password_hash, role, is_active, email_verified_at)
+   VALUES ($1, 'Development Administrator', $2, 'ADMIN', TRUE, CURRENT_TIMESTAMP)
    ON CONFLICT (LOWER(email)) DO UPDATE
    SET full_name = EXCLUDED.full_name,
        password_hash = EXCLUDED.password_hash,
@@ -36,8 +36,8 @@ await pool.query(
 console.log(`Development account ready: ${email.toLowerCase()}`);
 
 await pool.query(
-  `INSERT INTO users (email, full_name, password_hash, role, is_active)
-   VALUES ($1, 'Pieter Jacobs', $2, 'TECHNICIAN', TRUE)
+  `INSERT INTO users (email, full_name, password_hash, role, is_active, email_verified_at)
+   VALUES ($1, 'Pieter Jacobs', $2, 'TECHNICIAN', TRUE, CURRENT_TIMESTAMP)
    ON CONFLICT (LOWER(email)) DO UPDATE
    SET full_name = EXCLUDED.full_name,
        password_hash = EXCLUDED.password_hash,
