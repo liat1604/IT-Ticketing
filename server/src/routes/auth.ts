@@ -36,7 +36,7 @@ const nwuEmailSchema = z
   .email()
   .refine(
     (email) => email.endsWith("@mynwu.ac.za"),
-    "Use a valid NWU email address",
+    "Use a valid @mynwu.ac.za email address",
   );
 
 const registerSchema = z.object({

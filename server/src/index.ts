@@ -1,4 +1,6 @@
 import "dotenv/config";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import cookieParser from "cookie-parser";
 import express from "express";
 import helmet from "helmet";
@@ -13,6 +15,7 @@ import { jobCardsRouter } from "./routes/job-cards.js";
 import { startNotificationMailer } from "./services/notification-mailer.js";
 
 const app = express();
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
 app.use(helmet());
 app.use(express.json({ limit: "100kb" }));
@@ -35,6 +38,13 @@ app.get("/api/health", async (_request, response) => {
       database: "unavailable",
     });
   }
+});
+
+app.get("/api/resources/user-guide", (_request, response) => {
+  response.download(
+    path.join(projectRoot, "output", "pdf", "csis-it-support-user-guide.pdf"),
+    "csis-it-support-user-guide.pdf",
+  );
 });
 
 app.use("/api/auth", authRouter);
