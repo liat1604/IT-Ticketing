@@ -42,7 +42,8 @@ export async function requireAuth(
        WHERE sessions.token_hash = $1
          AND sessions.revoked_at IS NULL
          AND sessions.expires_at > CURRENT_TIMESTAMP
-         AND users.is_active = TRUE`,
+         AND users.is_active = TRUE
+         AND users.email_verified_at IS NOT NULL`,
       [hashSessionToken(token)],
     );
 

@@ -1,3 +1,4 @@
+import { queueEmailVerification } from "../services/email-verification.js";
 import { hash } from "bcryptjs";
 import { Router } from "express";
 import { z } from "zod";
@@ -489,6 +490,7 @@ adminRouter.post("/users", async (request, response) => {
       [parsed.data.fullName, parsed.data.email, passwordHash, parsed.data.role],
     );
     const user = result.rows[0];
+    await queueEmailVerification(client, user);
 
     await client.query(
       `INSERT INTO audit_events (actor_id, action, new_values)
@@ -530,6 +532,73 @@ adminRouter.post("/users", async (request, response) => {
   }
 });
 
+adminRouter.delete("/users/:userId", async (request, response) => {
+  const actor = currentUser(request);
+  const parsedId = z.string().uuid().safeParse(request.params.userId);
+  if (!parsedId.success) {
+    response.status(400).json({ error: "Invalid user ID" });
+    return;
+  }
+  if (parsedId.data === actor.id) {
+    response.status(409).json({ error: "You cannot delete your own account" });
+    return;
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await client.query<{ id: string; email: string; full_name: string; role: string }>(
+      `SELECT id, email, full_name, role FROM users WHERE id = $1 FOR UPDATE`, [parsedId.data],
+    );
+    const user = result.rows[0];
+    if (!user) {
+      await client.query("ROLLBACK");
+      response.status(404).json({ error: "User not found" });
+      return;
+    }
+    if (!canManageRole(actor, user.role)) {
+      await client.query("ROLLBACK");
+      response.status(403).json({ error: "Only a system administrator can delete system administrators" });
+      return;
+    }
+    // Schedule assignees have SET NULL semantics; protect their history explicitly.
+    const scheduled = await client.query(`SELECT 1 FROM schedule_events WHERE assigned_to = $1 LIMIT 1`, [user.id]);
+    if (scheduled.rowCount) {
+      await client.query("ROLLBACK");
+      response.status(409).json({ error: "This account has linked operational history. Deactivate it instead to preserve those records." });
+      return;
+    }
+    // Keep historical audit events and their actor identity after removing the account.
+    await client.query(
+      `UPDATE audit_events SET actor_id = NULL,
+         previous_values = COALESCE(previous_values, '{}'::jsonb) || jsonb_build_object('deletedActor', $2::jsonb)
+       WHERE actor_id = $1`,
+      [user.id, JSON.stringify({ id: user.id, fullName: user.full_name, email: user.email })],
+    );
+    // Other operational foreign keys deliberately prevent deletion, including tickets,
+    // comments, time entries, job cards and events created by this user.
+    await client.query(`DELETE FROM users WHERE id = $1`, [user.id]);
+    await client.query(
+      `DELETE FROM notification_outbox WHERE LOWER(recipient_email) = LOWER($1)
+       AND event_type IN ('EMAIL_VERIFICATION_REQUESTED', 'PASSWORD_RESET_REQUESTED')`, [user.email],
+    );
+    await client.query(
+      `INSERT INTO audit_events (actor_id, action, previous_values)
+       VALUES ($1, 'USER_DELETED_BY_ADMIN', $2::jsonb)`,
+      [actor.id, JSON.stringify({ userId: user.id, fullName: user.full_name, email: user.email, role: user.role })],
+    );
+    await client.query("COMMIT");
+    response.status(204).send();
+  } catch (error) {
+    await client.query("ROLLBACK");
+    if ((error as { code?: string }).code === "23503") {
+      response.status(409).json({ error: "This account has linked tickets or operational history. Deactivate it instead to preserve those records." });
+      return;
+    }
+    console.error("User deletion failed", error);
+    response.status(500).json({ error: "Could not delete the user account" });
+  } finally { client.release(); }
+});
 adminRouter.patch("/users/:userId", async (request, response) => {
   const actor = currentUser(request);
   const parsedId = z.string().uuid().safeParse(request.params.userId);
@@ -673,7 +742,7 @@ adminRouter.get("/audit", async (request, response) => {
          audit_events.previous_values AS "previousValues",
          audit_events.new_values AS "newValues",
          audit_events.created_at AS "createdAt",
-         users.full_name AS "actorName",
+         COALESCE(users.full_name, audit_events.previous_values->'deletedActor'->>'fullName') AS "actorName",
          tickets.ticket_number AS "ticketNumber"
        FROM audit_events
        LEFT JOIN users ON users.id = audit_events.actor_id

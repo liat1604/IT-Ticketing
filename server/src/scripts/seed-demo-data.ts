@@ -191,8 +191,8 @@ async function upsertUser(
 ) {
   const passwordHash = await hash(user.password, 12);
   const result = await client.query<{ id: string }>(
-    `INSERT INTO users (full_name, email, password_hash, role, is_active)
-     VALUES ($1, $2, $3, $4, TRUE)
+    `INSERT INTO users (full_name, email, password_hash, role, is_active, email_verified_at)
+     VALUES ($1, $2, $3, $4, TRUE, CURRENT_TIMESTAMP)
      ON CONFLICT (LOWER(email)) DO UPDATE
        SET full_name = EXCLUDED.full_name,
            password_hash = EXCLUDED.password_hash,
