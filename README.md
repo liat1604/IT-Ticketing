@@ -30,6 +30,8 @@ Get-Content -LiteralPath ".\server\db\migrations\002_auth_sessions.sql" -Raw | d
 Get-Content -LiteralPath ".\server\db\migrations\003_operational_features.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
 Get-Content -LiteralPath ".\server\db\migrations\004_ticket_sub_issues.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
 Get-Content -LiteralPath ".\server\db\migrations\005_job_cards.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
+Get-Content -LiteralPath ".\server\db\migrations\006_ticket_started_notification.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
+Get-Content -LiteralPath ".\server\db\migrations\007_job_card_walk_ins.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
 npm --prefix server run seed-demo
 ```
 
@@ -92,6 +94,13 @@ progress, two escalated and two resolved. Their ages range from two hours to six
 days so the dashboard, queues, escalation flow and historical reporting all
 have representative data. The seed validates this status and age coverage
 before writing anything to the database.
+
+It also creates two job cards for Sebastian Klopper: one linked to the Lab G14
+projector ticket and one manually captured walk-in Wi-Fi job. In **Job cards →
+Create job card**, choosing a ticket copies its requester, title, description,
+technician, category, priority, location and station into the form. Leave
+**Linked ticket** set to **No ticket — manual walk-in job** to record a walk-in
+request directly; enter the requester's name and the job details manually.
 
 ## First system administrator
 
