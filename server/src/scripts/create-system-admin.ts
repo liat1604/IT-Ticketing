@@ -26,8 +26,8 @@ async function main() {
 
   const passwordHash = await hash(parsed.data.password, 12);
   const result = await pool.query<{ id: string; email: string }>(
-    `INSERT INTO users (full_name, email, password_hash, role, is_active)
-     VALUES ($1, $2, $3, 'SYSTEM_ADMIN', TRUE)
+    `INSERT INTO users (full_name, email, password_hash, role, is_active, email_verified_at)
+     VALUES ($1, $2, $3, 'SYSTEM_ADMIN', TRUE, CURRENT_TIMESTAMP)
      ON CONFLICT (email) DO UPDATE
        SET full_name = EXCLUDED.full_name,
            password_hash = EXCLUDED.password_hash,

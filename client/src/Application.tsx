@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { BarChart3, BookOpen, BriefcaseBusiness, CalendarDays, ClipboardList, Download, Gauge, HelpCircle, History, LoaderCircle, LogOut, Menu, Settings, ShieldCheck, UsersRound, Wrench, X } from "lucide-react";
+import { BarChart3, BookOpen, BriefcaseBusiness, CalendarDays, ClipboardList, Download, Eye, EyeOff, Gauge, HelpCircle, History, LoaderCircle, LogOut, Menu, Settings, ShieldCheck, UsersRound, Wrench, X } from "lucide-react";
 
 import { api, formatValue } from "@/lib/api";
 import type { PortalSection, User } from "@/types";
@@ -85,11 +85,56 @@ function pageTitle(section: PortalSection, user: User) {
 }
 
 function AuthenticationPage({ onAuthenticated }: { onAuthenticated: (user: User) => void }) {
-  const [mode, setMode] = useState<"login" | "register">("login"); const [submitting, setSubmitting] = useState(false); const [error, setError] = useState("");
-  async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setSubmitting(true); setError(""); const data = new FormData(event.currentTarget); const body = mode === "register" ? { fullName: data.get("fullName"), email: data.get("email"), password: data.get("password") } : { email: data.get("email"), password: data.get("password") }; try { onAuthenticated((await api<{ user: User }>(`/api/auth/${mode}`, { method: "POST", body: JSON.stringify(body) })).user); } catch (caught) { setError(caught instanceof Error ? caught.message : "Authentication failed"); } finally { setSubmitting(false); } }
+  type AuthMode = "login" | "register" | "forgot" | "reset" | "verify" | "resend";
+  const verifyToken = new URLSearchParams(window.location.search).get("verifyToken") ?? "";
+  const resetToken = new URLSearchParams(window.location.search).get("resetToken") ?? "";
+  const [mode, setMode] = useState<AuthMode>(verifyToken ? "verify" : resetToken ? "reset" : "login");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [fieldError, setFieldError] = useState("");
+  const [message, setMessage] = useState("");
+
+  function changeMode(next: AuthMode) { setMode(next); setError(""); setFieldError(""); setMessage(""); }
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setSubmitting(true); setError(""); setFieldError(""); setMessage("");
+    const data = new FormData(event.currentTarget);
+    const password = String(data.get("password") ?? "");
+    const confirmPassword = String(data.get("confirmPassword") ?? "");
+    if ((mode === "register" || mode === "reset") && password !== confirmPassword) { setFieldError("Passwords do not match."); setSubmitting(false); return; }
+    try {
+      if (mode === "verify") {
+        const result = await api<{ message: string }>("/api/auth/verify-email", { method: "POST", body: JSON.stringify({ token: verifyToken }) });
+        window.history.replaceState({}, "", window.location.pathname); changeMode("login"); setMessage(result.message); return;
+      }
+      if (mode === "resend") {
+        const result = await api<{ message: string }>("/api/auth/resend-verification", { method: "POST", body: JSON.stringify({ email: data.get("email") }) });
+        setMessage(result.message); return;
+      }
+      if (mode === "forgot") {
+        const result = await api<{ message: string }>("/api/auth/forgot-password", { method: "POST", body: JSON.stringify({ email: data.get("email") }) });
+        setMessage(result.message); return;
+      }
+      if (mode === "reset") {
+        const result = await api<{ message: string }>("/api/auth/reset-password", { method: "POST", body: JSON.stringify({ token: resetToken, password, confirmPassword }) });
+        window.history.replaceState({}, "", window.location.pathname); changeMode("login"); setMessage(result.message); return;
+      }
+      const body = mode === "register" ? { fullName: data.get("fullName"), email: data.get("email"), password, confirmPassword } : { email: data.get("email"), password };
+      if (mode === "register") {
+        const result = await api<{ message: string }>("/api/auth/register", { method: "POST", body: JSON.stringify(body) });
+        changeMode("resend"); setMessage(result.message); return;
+      }
+      onAuthenticated((await api<{ user: User }>("/api/auth/login", { method: "POST", body: JSON.stringify(body) })).user);
+    } catch (caught) { setError(caught instanceof Error ? caught.message : "Authentication failed"); }
+    finally { setSubmitting(false); }
+  }
   return <main className="grid min-h-screen lg:grid-cols-2"><section className="hidden bg-[#4B2C70] p-12 text-white lg:flex lg:flex-col lg:justify-between"><div className="flex items-center gap-3"><img src="/ticket-logo.png?v=2" alt="CSIS IT Support logo" className="size-12 rounded-full object-contain" /><div><p className="font-semibold">CSIS IT Support</p><p className="text-sm text-purple-200">North-West University</p></div></div><div className="max-w-lg"><p className="text-sm font-medium uppercase tracking-[0.2em] text-purple-200">One place for every request</p><h1 className="mt-4 text-4xl font-semibold leading-tight">From fault report to resolution, every action is visible and accountable.</h1><p className="mt-5 text-lg leading-8 text-purple-100">A secure support portal for CSIS students, staff, technicians and administrators.</p></div><div className="flex items-center gap-2 text-sm text-purple-200"><ShieldCheck className="size-4" /> Authorised NWU access</div></section>
-    <section className="flex items-center justify-center bg-slate-50 p-4 sm:p-6"><div className="w-full max-w-lg space-y-4 py-4"><Card><CardHeader><img src="/ticket-logo.png?v=2" alt="CSIS IT Support logo" className="mb-3 size-11 rounded-full self-start object-contain lg:hidden" /><CardTitle className="text-2xl">{mode === "login" ? "Welcome back" : "Create reporter account"}</CardTitle><CardDescription>{mode === "login" ? "Sign in using your @mynwu.ac.za email address." : "Register to submit and track CSIS support requests."}</CardDescription></CardHeader><CardContent><div className="mb-6 grid grid-cols-2 rounded-lg bg-slate-100 p-1"><ModeButton active={mode === "login"} onClick={() => { setMode("login"); setError(""); }}>Sign in</ModeButton><ModeButton active={mode === "register"} onClick={() => { setMode("register"); setError(""); }}>Register</ModeButton></div><form className="space-y-4" onSubmit={submit}>{mode === "register" && <Field label="Full name" htmlFor="fullName"><Input id="fullName" name="fullName" autoComplete="name" required /></Field>}<Field label="NWU email address" htmlFor="email"><Input id="email" name="email" type="email" autoComplete="email" placeholder="name@mynwu.ac.za" required /></Field><Field label="Password" htmlFor="password"><Input id="password" name="password" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "register" ? 12 : undefined} required />{mode === "register" && <p className="text-xs text-muted-foreground">At least 12 characters with uppercase, lowercase and a number.</p>}</Field>{error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{error}</p>}<Button type="submit" className="h-10 w-full bg-[#4B2C70] text-white hover:bg-[#3d235d]" disabled={submitting}>{submitting && <LoaderCircle className="animate-spin" />}{submitting ? "Please wait..." : mode === "login" ? "Sign in" : "Create account"}</Button></form></CardContent></Card><LoginHelp /></div></section>
+    <section className="flex items-center justify-center bg-slate-50 p-4 sm:p-6"><div className="w-full max-w-lg space-y-4 py-4"><Card><CardHeader><img src="/ticket-logo.png?v=2" alt="CSIS IT Support logo" className="mb-3 size-11 rounded-full self-start object-contain lg:hidden" /><CardTitle className="text-2xl">{mode === "login" ? "Welcome back" : mode === "register" ? "Create reporter account" : mode === "forgot" ? "Forgot your password?" : mode === "verify" ? "Verify your email" : mode === "resend" ? "Resend verification email" : "Choose a new password"}</CardTitle><CardDescription>{mode === "login" ? "Sign in using your @mynwu.ac.za email address." : mode === "register" ? "Register, then verify your email to sign in and submit support requests." : mode === "forgot" ? "Enter your NWU email and we will send a secure reset link." : mode === "verify" ? "Confirm your email address to unlock sign-in and ticket creation." : mode === "resend" ? "Enter your NWU email to receive a verification link. Links expire after 24 hours." : "Your reset link is single-use and expires after 15 minutes."}</CardDescription></CardHeader><CardContent>{(mode === "login" || mode === "register") && <div className="mb-6 grid grid-cols-2 rounded-lg bg-slate-100 p-1"><ModeButton active={mode === "login"} onClick={() => changeMode("login")}>Sign in</ModeButton><ModeButton active={mode === "register"} onClick={() => changeMode("register")}>Register</ModeButton></div>}<form className="space-y-4" onSubmit={submit}>{mode === "register" && <Field label="Full name" htmlFor="fullName"><Input id="fullName" name="fullName" autoComplete="name" required /></Field>}{mode !== "reset" && mode !== "verify" && <Field label="NWU email address" htmlFor="email"><Input id="email" name="email" type="email" autoComplete="email" placeholder="name@mynwu.ac.za" required /></Field>}{(mode === "login" || mode === "register" || mode === "reset") && <><Field label={mode === "reset" ? "New password" : "Password"} htmlFor="password"><PasswordInput id="password" name="password" autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "login" ? undefined : 12} required />{mode !== "login" && <p className="text-xs text-muted-foreground">At least 12 characters with uppercase, lowercase and a number.</p>}</Field>{(mode === "register" || mode === "reset") && <Field label={mode === "reset" ? "Confirm new password" : "Confirm password"} htmlFor="confirmPassword"><PasswordInput id="confirmPassword" name="confirmPassword" autoComplete="new-password" minLength={12} required aria-invalid={Boolean(fieldError)} />{fieldError && <p className="text-sm text-red-700" role="alert">{fieldError}</p>}</Field>}</>}{mode === "login" && <div className="-mt-1 text-right"><button type="button" className="text-sm font-medium text-[#4B2C70] hover:underline" onClick={() => changeMode("forgot")}>Forgot password?</button></div>}{error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{error}</p>}{message && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700" role="status">{message}</p>}<Button type="submit" className="h-10 w-full bg-[#4B2C70] text-white hover:bg-[#3d235d]" disabled={submitting || (mode === "forgot" && Boolean(message))}>{submitting && <LoaderCircle className="animate-spin" />}{submitting ? "Please wait..." : mode === "login" ? "Sign in" : mode === "register" ? "Create account" : mode === "forgot" ? "Send reset link" : mode === "verify" ? "Verify email" : mode === "resend" ? "Send verification link" : "Reset password"}</Button>{(mode === "forgot" || mode === "reset" || mode === "verify" || mode === "resend") && <Button type="button" variant="ghost" className="w-full" onClick={() => changeMode("login")}>Back to sign in</Button>}{(mode === "login" || mode === "verify") && <Button type="button" variant="ghost" className="w-full" disabled={submitting} onClick={() => changeMode("resend")}>Resend verification email</Button>}</form></CardContent></Card><LoginHelp /></div></section>
   </main>;
+}
+
+function PasswordInput(props: React.ComponentProps<typeof Input>) {
+  const [visible, setVisible] = useState(false);
+  return <div className="relative"><Input {...props} type={visible ? "text" : "password"} className={`pr-11 ${props.className ?? ""}`} /><button type="button" className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4B2C70]" onClick={() => setVisible((current) => !current)} aria-label={visible ? "Hide password" : "Show password"} aria-pressed={visible}>{visible ? <EyeOff className="size-4" aria-hidden="true" /> : <Eye className="size-4" aria-hidden="true" />}</button></div>;
 }
 
 const loginFaq = [
