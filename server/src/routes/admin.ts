@@ -9,6 +9,7 @@ import {
   type AuthenticatedRequest,
   type AuthenticatedUser,
 } from "../middleware/require-auth.js";
+import { getEmailDeliveryStatus, sendTestEmail } from "../services/notification-mailer.js";
 
 export const adminRouter = Router();
 
@@ -31,9 +32,20 @@ const nwuEmailSchema = z
   .toLowerCase()
   .email()
   .refine(
-    (email) => email.endsWith("@nwu.ac.za") || email.endsWith("@student.g.nwu.ac.za"),
+    (email) => email.endsWith("@mynwu.ac.za"),
     "Use a valid NWU email address",
   );
+
+adminRouter.get("/email/status", requireRole("SYSTEM_ADMIN"), async (_request, response) => {
+  try { response.json(await getEmailDeliveryStatus()); }
+  catch (error) { console.error("Email status check failed", error); response.status(500).json({ error: "Could not check email delivery status" }); }
+});
+
+adminRouter.post("/email/test", requireRole("SYSTEM_ADMIN"), async (request, response) => {
+  const actor = (request as AuthenticatedRequest).user;
+  try { await sendTestEmail(actor.email); response.json({ message: `Test email sent to ${actor.email}` }); }
+  catch (error) { const message = error instanceof Error ? error.message : "Test email failed"; response.status(502).json({ error: message }); }
+});
 
 const createUserSchema = z.object({
   fullName: z.string().trim().min(2).max(120),

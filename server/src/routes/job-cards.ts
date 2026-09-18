@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { pool } from "../db.js";
 import { requireAuth, requireRole, type AuthenticatedRequest, type AuthenticatedUser } from "../middleware/require-auth.js";
+import { enqueueTicketStarted } from "../services/notification-outbox.js";
 
 export const jobCardsRouter = Router();
 jobCardsRouter.use(requireAuth, requireRole("TECHNICIAN", "ADMIN", "SYSTEM_ADMIN"));
@@ -56,9 +57,31 @@ jobCardsRouter.post("/", async (request, response) => {
   } catch(error){await client.query("ROLLBACK");console.error("Job card creation failed",error);response.status(500).json({error:"Job card creation failed"});} finally{client.release();}
 });
 
-async function loadManaged(id:string, actor:AuthenticatedUser){const result=await pool.query<{id:string;primary_ticket_id:string;assigned_to:string;status:string}>(`SELECT id,primary_ticket_id,assigned_to,status FROM job_cards WHERE id=$1`,[id]);const card=result.rows[0];return card&&(admin(actor)||card.assigned_to===actor.id)?card:null;}
+async function loadManaged(id:string, actor:AuthenticatedUser){const result=await pool.query<{id:string;primary_ticket_id:string;assigned_to:string;status:string;ticket_number:string;ticket_title:string;ticket_status:string;reporter_email:string;technician_name:string}>(`SELECT jc.id,jc.primary_ticket_id,jc.assigned_to,jc.status,t.ticket_number,t.title AS ticket_title,t.status::text AS ticket_status,r.email AS reporter_email,u.full_name AS technician_name FROM job_cards jc JOIN tickets t ON t.id=jc.primary_ticket_id JOIN users r ON r.id=t.reporter_id JOIN users u ON u.id=jc.assigned_to WHERE jc.id=$1`,[id]);const card=result.rows[0];return card&&(admin(actor)||card.assigned_to===actor.id)?card:null;}
 
-jobCardsRouter.post("/:id/timer/:action", async (request,response)=>{const parsed=idSchema.safeParse(request.params.id);const action=request.params.action;if(!parsed.success||!["start","pause","resume"].includes(action)){response.status(400).json({error:"Invalid timer action"});return;}const actor=user(request);const card=await loadManaged(parsed.data,actor);if(!card){response.status(403).json({error:"Only the assigned technician or an administrator can manage this job card"});return;}const client=await pool.connect();try{await client.query("BEGIN");if(action==="pause"){const stopped=await client.query(`UPDATE time_entries SET stopped_at=CURRENT_TIMESTAMP WHERE job_card_id=$1 AND stopped_at IS NULL RETURNING id`,[card.id]);if(!stopped.rowCount){await client.query("ROLLBACK");response.status(409).json({error:"This job card has no live timer"});return;}await client.query(`UPDATE job_cards SET status='PAUSED',updated_at=CURRENT_TIMESTAMP WHERE id=$1`,[card.id]);}else{await client.query(`INSERT INTO time_entries(ticket_id,technician_id,job_card_id) VALUES($1,$2,$3)`,[card.primary_ticket_id,card.assigned_to,card.id]);await client.query(`UPDATE job_cards SET status='LIVE',updated_at=CURRENT_TIMESTAMP WHERE id=$1`,[card.id]);}await client.query(`INSERT INTO audit_events(ticket_id,actor_id,action,new_values) VALUES($1,$2,$3,$4::jsonb)`,[card.primary_ticket_id,actor.id,`JOB_CARD_TIMER_${action.toUpperCase()}`,JSON.stringify({jobCardId:card.id})]);await client.query("COMMIT");response.json({ok:true});}catch(error){await client.query("ROLLBACK");if((error as {code?:string}).code==="23505"){response.status(409).json({error:"This technician or ticket already has a live timer"});return;}response.status(500).json({error:"Timer action failed"});}finally{client.release();}});
+jobCardsRouter.post("/:id/timer/:action", async (request,response)=>{
+  const parsed=idSchema.safeParse(request.params.id);const action=request.params.action;
+  if(!parsed.success||!["start","pause","resume"].includes(action)){response.status(400).json({error:"Invalid timer action"});return;}
+  const actor=user(request);const card=await loadManaged(parsed.data,actor);
+  if(!card){response.status(403).json({error:"Only the assigned technician or an administrator can manage this job card"});return;}
+  const client=await pool.connect();
+  try{await client.query("BEGIN");
+    if(action==="pause"){
+      const stopped=await client.query(`UPDATE time_entries SET stopped_at=CURRENT_TIMESTAMP WHERE job_card_id=$1 AND stopped_at IS NULL RETURNING id`,[card.id]);
+      if(!stopped.rowCount){await client.query("ROLLBACK");response.status(409).json({error:"This job card has no live timer"});return;}
+      await client.query(`UPDATE job_cards SET status='PAUSED',updated_at=CURRENT_TIMESTAMP WHERE id=$1`,[card.id]);
+    }else{
+      const timer=await client.query<{started_at:Date}>(`INSERT INTO time_entries(ticket_id,technician_id,job_card_id) VALUES($1,$2,$3) RETURNING started_at`,[card.primary_ticket_id,card.assigned_to,card.id]);
+      await client.query(`UPDATE job_cards SET status='LIVE',updated_at=CURRENT_TIMESTAMP WHERE id=$1`,[card.id]);
+      if(action==="start"&&card.ticket_status!=="IN_PROGRESS"){
+        await client.query(`UPDATE tickets SET status='IN_PROGRESS',updated_at=CURRENT_TIMESTAMP WHERE id=$1`,[card.primary_ticket_id]);
+        await enqueueTicketStarted(client,{ticketId:card.primary_ticket_id,reporterEmail:card.reporter_email,ticketNumber:card.ticket_number,ticketTitle:card.ticket_title,technicianName:card.technician_name,startedAt:timer.rows[0].started_at});
+      }
+    }
+    await client.query(`INSERT INTO audit_events(ticket_id,actor_id,action,new_values) VALUES($1,$2,$3,$4::jsonb)`,[card.primary_ticket_id,actor.id,`JOB_CARD_TIMER_${action.toUpperCase()}`,JSON.stringify({jobCardId:card.id})]);
+    await client.query("COMMIT");response.json({ok:true});
+  }catch(error){await client.query("ROLLBACK");if((error as {code?:string}).code==="23505"){response.status(409).json({error:"This technician or ticket already has a live timer"});return;}response.status(500).json({error:"Timer action failed"});}finally{client.release();}
+});
 
 jobCardsRouter.post("/:id/complete",async(request,response)=>{const parsed=idSchema.safeParse(request.params.id);const note=z.string().trim().min(5).max(2000).safeParse(request.body?.completionNote);if(!parsed.success||!note.success){response.status(400).json({error:"A completion note of at least 5 characters is required"});return;}const actor=user(request);const card=await loadManaged(parsed.data,actor);if(!card){response.status(403).json({error:"You cannot complete this job card"});return;}const client=await pool.connect();try{await client.query("BEGIN");await client.query(`UPDATE time_entries SET stopped_at=CURRENT_TIMESTAMP WHERE job_card_id=$1 AND stopped_at IS NULL`,[card.id]);await client.query(`UPDATE job_cards SET status='COMPLETED',completion_note=$2,completed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=$1`,[card.id,note.data]);await client.query(`INSERT INTO audit_events(ticket_id,actor_id,action,new_values) VALUES($1,$2,'JOB_CARD_COMPLETED',$3::jsonb)`,[card.primary_ticket_id,actor.id,JSON.stringify({jobCardId:card.id,completionNote:note.data})]);await client.query("COMMIT");response.json({ok:true});}catch(error){await client.query("ROLLBACK");response.status(500).json({error:"Could not complete job card"});}finally{client.release();}});
 

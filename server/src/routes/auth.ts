@@ -35,9 +35,7 @@ const nwuEmailSchema = z
   .toLowerCase()
   .email()
   .refine(
-    (email) =>
-      email.endsWith("@nwu.ac.za") ||
-      email.endsWith("@student.g.nwu.ac.za"),
+    (email) => email.endsWith("@mynwu.ac.za"),
     "Use a valid NWU email address",
   );
 

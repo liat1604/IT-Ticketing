@@ -32,25 +32,25 @@ type SeedTicket = {
 const users: SeedUser[] = [
   {
     fullName: "Selouna Visser",
-    email: "selouna.visser@nwu.ac.za",
+    email: "selouna.visser@mynwu.ac.za",
     password: "SystemAdmin2026!",
     role: "SYSTEM_ADMIN",
   },
   {
     fullName: "Development Administrator",
-    email: "dev.admin@nwu.ac.za",
+    email: "dev.admin@mynwu.ac.za",
     password: "Development123!",
     role: "ADMIN",
   },
   {
     fullName: "Sebastian Klopper",
-    email: "sebastian.klopper@nwu.ac.za",
+    email: "sebastian.klopper@mynwu.ac.za",
     password: "TechDemo2026!",
     role: "TECHNICIAN",
   },
   {
     fullName: "Amina Dlamini",
-    email: "amina.dlamini@student.g.nwu.ac.za",
+    email: "amina.dlamini@mynwu.ac.za",
     password: "StudentDemo2026!",
     role: "REPORTER",
   },
@@ -92,7 +92,7 @@ const tickets: SeedTicket[] = [
     locationDetails: "Rows B to D",
     priority: "HIGH",
     status: "IN_PROGRESS",
-    technicianEmail: "sebastian.klopper@nwu.ac.za",
+    technicianEmail: "sebastian.klopper@mynwu.ac.za",
     ageHours: 18,
   },
   {
@@ -104,7 +104,7 @@ const tickets: SeedTicket[] = [
     locationDetails: "Stations 20 to 26",
     priority: "MEDIUM",
     status: "IN_PROGRESS",
-    technicianEmail: "sebastian.klopper@nwu.ac.za",
+    technicianEmail: "sebastian.klopper@mynwu.ac.za",
     ageHours: 26,
   },
   {
@@ -116,7 +116,7 @@ const tickets: SeedTicket[] = [
     locationDetails: "Distribution cabinet G-02",
     priority: "CRITICAL",
     status: "ESCALATED",
-    technicianEmail: "sebastian.klopper@nwu.ac.za",
+    technicianEmail: "sebastian.klopper@mynwu.ac.za",
     ageHours: 30,
     escalationReason: "The fault affects the building distribution layer and requires Central IT network engineering access.",
     externalReference: "NWU-CT-2026-104",
@@ -130,7 +130,7 @@ const tickets: SeedTicket[] = [
     locationDetails: "All student stations",
     priority: "HIGH",
     status: "ESCALATED",
-    technicianEmail: "sebastian.klopper@nwu.ac.za",
+    technicianEmail: "sebastian.klopper@mynwu.ac.za",
     ageHours: 48,
     escalationReason: "The issue appears to originate from central identity policy and cannot be corrected within CSIS permissions.",
     externalReference: "NWU-CT-2026-105",
@@ -144,7 +144,7 @@ const tickets: SeedTicket[] = [
     locationDetails: "Station 12",
     priority: "LOW",
     status: "RESOLVED",
-    technicianEmail: "sebastian.klopper@nwu.ac.za",
+    technicianEmail: "sebastian.klopper@mynwu.ac.za",
     ageHours: 96,
     resolutionSummary: "Replaced the keyboard, tested all keys and returned the station to service.",
   },
@@ -157,7 +157,7 @@ const tickets: SeedTicket[] = [
     locationDetails: "Secondary UPS rack",
     priority: "CRITICAL",
     status: "RESOLVED",
-    technicianEmail: "sebastian.klopper@nwu.ac.za",
+    technicianEmail: "sebastian.klopper@mynwu.ac.za",
     ageHours: 144,
     resolutionSummary: "Isolated the affected UPS, cleared the blocked ventilation path and confirmed stable operating temperature.",
   },
@@ -211,18 +211,38 @@ async function main() {
   try {
     await client.query("BEGIN");
 
+    const legacyDemoEmails = [
+      ["selouna.visser@nwu.ac.za", "selouna.visser@mynwu.ac.za"],
+      ["dev.admin@nwu.ac.za", "dev.admin@mynwu.ac.za"],
+      ["sebastian.klopper@nwu.ac.za", "sebastian.klopper@mynwu.ac.za"],
+      ["amina.dlamini@student.g.nwu.ac.za", "amina.dlamini@mynwu.ac.za"],
+    ] as const;
+
+    for (const [legacyEmail, currentEmail] of legacyDemoEmails) {
+      await client.query(
+        `UPDATE users
+         SET email = $2,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE LOWER(email) = $1
+           AND NOT EXISTS (
+             SELECT 1 FROM users existing WHERE LOWER(existing.email) = $2
+           )`,
+        [legacyEmail, currentEmail],
+      );
+    }
+
     const oldTechnician = await client.query<{ id: string }>(
-      `SELECT id FROM users WHERE LOWER(email) = 'technician.test@nwu.ac.za'`,
+      `SELECT id FROM users WHERE LOWER(email) = 'technician.test@mynwu.ac.za'`,
     );
     const existingLerato = await client.query<{ id: string }>(
-      `SELECT id FROM users WHERE LOWER(email) = 'lerato.mokoena@nwu.ac.za'`,
+      `SELECT id FROM users WHERE LOWER(email) = 'lerato.mokoena@mynwu.ac.za'`,
     );
 
     if (oldTechnician.rows[0] && !existingLerato.rows[0]) {
       await client.query(
         `UPDATE users
          SET full_name = 'Lerato Mokoena',
-             email = 'lerato.mokoena@nwu.ac.za',
+             email = 'lerato.mokoena@mynwu.ac.za',
              updated_at = CURRENT_TIMESTAMP
          WHERE id = $1`,
         [oldTechnician.rows[0].id],
@@ -234,7 +254,7 @@ async function main() {
       userIds.set(user.email, await upsertUser(client, user));
     }
 
-    const reporterEmail = "amina.dlamini@student.g.nwu.ac.za";
+    const reporterEmail = "amina.dlamini@mynwu.ac.za";
     const reporterId = userIds.get(reporterEmail);
     if (!reporterId) throw new Error("The seeded student reporter account is required");
     const reporter = { id: reporterId, email: reporterEmail };
@@ -375,7 +395,7 @@ async function main() {
        WHERE NOT EXISTS (
          SELECT 1 FROM audit_events WHERE action = 'DEMO_DATA_SEEDED'
        )`,
-      [userIds.get("selouna.visser@nwu.ac.za"), JSON.stringify({ accounts: users.length, technicians: 1, tickets: tickets.length })],
+      [userIds.get("selouna.visser@mynwu.ac.za"), JSON.stringify({ accounts: users.length, technicians: 1, tickets: tickets.length })],
     );
 
     await client.query("COMMIT");
