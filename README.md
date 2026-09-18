@@ -30,7 +30,13 @@ Get-Content -LiteralPath ".\server\db\migrations\002_auth_sessions.sql" -Raw | d
 Get-Content -LiteralPath ".\server\db\migrations\003_operational_features.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
 Get-Content -LiteralPath ".\server\db\migrations\004_ticket_sub_issues.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
 Get-Content -LiteralPath ".\server\db\migrations\005_job_cards.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
+npm --prefix server run seed-demo
 ```
+
+The final command is required for the demonstration environment. It creates one
+login for each role and restores the aged new/open, in-progress, escalated and
+resolved tickets used during the demo. It is safe to rerun locally whenever the
+demo data needs to be restored.
 
 Start the API in one terminal:
 
@@ -61,6 +67,31 @@ npm --prefix server run seed:dev
 
 The default credentials are `dev.admin@nwu.ac.za` and `Development123!`.
 Change them locally if needed; `.env` is not committed.
+
+## Demo accounts
+
+Seed one local account for every application role, together with representative
+workflow tickets:
+
+```powershell
+npm --prefix server run seed-demo
+```
+
+| Role | Name | Email | Password |
+| --- | --- | --- | --- |
+| System administrator | Selouna Visser | `selouna.visser@nwu.ac.za` | `SystemAdmin2026!` |
+| Administrator | Development Administrator | `dev.admin@nwu.ac.za` | `Development123!` |
+| Technician | Sebastian Klopper | `sebastian.klopper@nwu.ac.za` | `TechDemo2026!` |
+| Student / reporter | Amina Dlamini | `amina.dlamini@student.g.nwu.ac.za` | `StudentDemo2026!` |
+
+These fixed credentials are for local demonstrations only. The seed command is
+blocked when `NODE_ENV=production`.
+
+The same seed creates eight demonstration tickets: two new/open, two in
+progress, two escalated and two resolved. Their ages range from two hours to six
+days so the dashboard, queues, escalation flow and historical reporting all
+have representative data. The seed validates this status and age coverage
+before writing anything to the database.
 
 ## First system administrator
 

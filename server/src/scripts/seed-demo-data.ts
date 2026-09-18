@@ -4,7 +4,8 @@ import type { PoolClient } from "pg";
 
 import { pool } from "../db.js";
 
-type UserRole = "REPORTER" | "TECHNICIAN" | "SYSTEM_ADMIN";
+type UserRole = "REPORTER" | "TECHNICIAN" | "ADMIN" | "SYSTEM_ADMIN";
+type TicketStatus = "NEW" | "IN_PROGRESS" | "ESCALATED" | "RESOLVED";
 type SeedUser = {
   fullName: string;
   email: string;
@@ -20,7 +21,7 @@ type SeedTicket = {
   location: string;
   locationDetails: string;
   priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
-  status: "NEW" | "IN_PROGRESS" | "ESCALATED" | "RESOLVED";
+  status: TicketStatus;
   technicianEmail?: string;
   ageHours: number;
   resolutionSummary?: string;
@@ -32,29 +33,31 @@ const users: SeedUser[] = [
   {
     fullName: "Selouna Visser",
     email: "selouna.visser@nwu.ac.za",
-    password: requiredPassword("SEED_SELOUNA_PASSWORD"),
+    password: "SystemAdmin2026!",
     role: "SYSTEM_ADMIN",
+  },
+  {
+    fullName: "Development Administrator",
+    email: "dev.admin@nwu.ac.za",
+    password: "Development123!",
+    role: "ADMIN",
   },
   {
     fullName: "Sebastian Klopper",
     email: "sebastian.klopper@nwu.ac.za",
-    password: requiredPassword("SEED_SEBASTIAN_PASSWORD"),
+    password: "TechDemo2026!",
     role: "TECHNICIAN",
   },
   {
-    fullName: "Lerato Mokoena",
-    email: "lerato.mokoena@nwu.ac.za",
-    password: requiredPassword("SEED_LERATO_PASSWORD"),
-    role: "TECHNICIAN",
+    fullName: "Amina Dlamini",
+    email: "amina.dlamini@student.g.nwu.ac.za",
+    password: "StudentDemo2026!",
+    role: "REPORTER",
   },
 ];
 
-function requiredPassword(name: string) {
-  const value = process.env[name];
-  if (!value || value.length < 12) {
-    throw new Error(`${name} must contain a temporary password of at least 12 characters`);
-  }
-  return value;
+if (process.env.NODE_ENV === "production") {
+  throw new Error("Demo accounts cannot be seeded in production");
 }
 
 const tickets: SeedTicket[] = [
@@ -101,7 +104,7 @@ const tickets: SeedTicket[] = [
     locationDetails: "Stations 20 to 26",
     priority: "MEDIUM",
     status: "IN_PROGRESS",
-    technicianEmail: "lerato.mokoena@nwu.ac.za",
+    technicianEmail: "sebastian.klopper@nwu.ac.za",
     ageHours: 26,
   },
   {
@@ -127,7 +130,7 @@ const tickets: SeedTicket[] = [
     locationDetails: "All student stations",
     priority: "HIGH",
     status: "ESCALATED",
-    technicianEmail: "lerato.mokoena@nwu.ac.za",
+    technicianEmail: "sebastian.klopper@nwu.ac.za",
     ageHours: 48,
     escalationReason: "The issue appears to originate from central identity policy and cannot be corrected within CSIS permissions.",
     externalReference: "NWU-CT-2026-105",
@@ -154,11 +157,33 @@ const tickets: SeedTicket[] = [
     locationDetails: "Secondary UPS rack",
     priority: "CRITICAL",
     status: "RESOLVED",
-    technicianEmail: "lerato.mokoena@nwu.ac.za",
+    technicianEmail: "sebastian.klopper@nwu.ac.za",
     ageHours: 144,
     resolutionSummary: "Isolated the affected UPS, cleared the blocked ventilation path and confirmed stable operating temperature.",
   },
 ];
+
+const requiredTicketStatuses: TicketStatus[] = [
+  "NEW",
+  "IN_PROGRESS",
+  "ESCALATED",
+  "RESOLVED",
+];
+
+function assertDemoTicketCoverage() {
+  const seededStatuses = new Set(tickets.map((ticket) => ticket.status));
+  const missingStatuses = requiredTicketStatuses.filter(
+    (status) => !seededStatuses.has(status),
+  );
+
+  if (missingStatuses.length > 0) {
+    throw new Error(`Demo tickets are missing statuses: ${missingStatuses.join(", ")}`);
+  }
+
+  if (!tickets.some((ticket) => ticket.ageHours >= 72)) {
+    throw new Error("Demo data must include at least one ticket older than 72 hours");
+  }
+}
 
 async function upsertUser(
   client: PoolClient,
@@ -181,6 +206,7 @@ async function upsertUser(
 }
 
 async function main() {
+  assertDemoTicketCoverage();
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -208,15 +234,10 @@ async function main() {
       userIds.set(user.email, await upsertUser(client, user));
     }
 
-    const reporterResult = await client.query<{ id: string; email: string }>(
-      `SELECT id, email
-       FROM users
-       WHERE role = 'REPORTER' AND is_active = TRUE
-       ORDER BY created_at
-       LIMIT 1`,
-    );
-    const reporter = reporterResult.rows[0];
-    if (!reporter) throw new Error("An active reporter is required before seeding tickets");
+    const reporterEmail = "amina.dlamini@student.g.nwu.ac.za";
+    const reporterId = userIds.get(reporterEmail);
+    if (!reporterId) throw new Error("The seeded student reporter account is required");
+    const reporter = { id: reporterId, email: reporterEmail };
 
     for (const ticket of tickets) {
       const technicianId = ticket.technicianEmail
@@ -227,7 +248,30 @@ async function main() {
         : null;
 
       const ticketResult = await client.query<{ id: string; ticket_number: string }>(
-        `WITH inserted AS (
+        `WITH updated AS (
+           UPDATE tickets
+           SET reporter_id = $1,
+               created_by = $1,
+               assigned_to = $2,
+               category_id = categories.id,
+               location_id = locations.id,
+               location_details = $3,
+               title = $5,
+               description = $6,
+               priority = $7::ticket_priority,
+               status = $8::ticket_status,
+               source = 'WEB',
+               resolution_summary = $9,
+               resolved_at = $10,
+               created_at = CURRENT_TIMESTAMP - ($11 * INTERVAL '1 hour'),
+               updated_at = CURRENT_TIMESTAMP
+           FROM categories, locations
+           WHERE tickets.station_reference = $4
+             AND categories.name = $12
+             AND locations.name = $13
+           RETURNING tickets.id, tickets.ticket_number
+         ),
+         inserted AS (
            INSERT INTO tickets (
              reporter_id, created_by, assigned_to, category_id, location_id,
              location_details, station_reference, title, description,
@@ -242,14 +286,12 @@ async function main() {
            FROM categories, locations
            WHERE categories.name = $12
              AND locations.name = $13
-             AND NOT EXISTS (
-               SELECT 1 FROM tickets WHERE station_reference = $4
-             )
+             AND NOT EXISTS (SELECT 1 FROM updated)
            RETURNING id, ticket_number
          )
-         SELECT id, ticket_number FROM inserted
+         SELECT id, ticket_number FROM updated
          UNION ALL
-         SELECT id, ticket_number FROM tickets WHERE station_reference = $4
+         SELECT id, ticket_number FROM inserted
          LIMIT 1`,
         [
           reporter.id,
@@ -333,11 +375,11 @@ async function main() {
        WHERE NOT EXISTS (
          SELECT 1 FROM audit_events WHERE action = 'DEMO_DATA_SEEDED'
        )`,
-      [userIds.get("selouna.visser@nwu.ac.za"), JSON.stringify({ technicians: 2, tickets: tickets.length })],
+      [userIds.get("selouna.visser@nwu.ac.za"), JSON.stringify({ accounts: users.length, technicians: 1, tickets: tickets.length })],
     );
 
     await client.query("COMMIT");
-    console.log("Demo data ready: Selouna Visser, two technicians and eight workflow tickets.");
+    console.log("Demo data ready: one account for each role and eight workflow tickets.");
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;
