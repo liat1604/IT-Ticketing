@@ -4,13 +4,13 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "npm run build && node --test dist/tests/ticket-started-notification.test.js",
     "dev": "tsx watch src/index.ts",
     "seed:dev": "npm run build && node dist/seed-dev-user.js",
     "build": "tsc",
     "start": "node dist/index.js",
     "create-admin": "tsx src/scripts/create-system-admin.ts",
-    "seed-demo": "tsx src/scripts/seed-demo-data.ts",
+    "seed-demo": "npm run build && node dist/scripts/seed-demo-data.js",
     "smtp:verify": "npm run build && node dist/scripts/verify-smtp.js"
   },
   "keywords": [],

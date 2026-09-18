@@ -1,131 +1,18 @@
 import nodemailer from "nodemailer";
 import { pool } from "../db.js";
 
-type PendingNotification = {
-  id: string;
-  recipient_email: string;
-  event_type: string;
-  payload: Record<string, unknown>;
-};
+type PendingNotification = { id:string;recipient_email:string;event_type:string;payload:Record<string,unknown>;ticket_number:string|null;ticket_title:string|null;ticket_status:string|null };
+const pollIntervalMilliseconds=10_000,maxAttempts=5;
 
-const pollIntervalMilliseconds = 10_000;
-const maxAttempts = 5;
+function configuration(){const host=process.env.SMTP_HOST,user=process.env.SMTP_USER,password=process.env.SMTP_PASSWORD?.replace(/\s/g,""),from=process.env.MAIL_FROM??process.env.SMTP_FROM??user,port=Number(process.env.SMTP_PORT??587),secure=(process.env.SMTP_SECURE??String(port===465)).toLowerCase()==="true";return{configured:Boolean(host&&user&&password&&from),host,user,password,from,port,secure};}
+function transporter(){const config=configuration();if(!config.configured)throw new Error("SMTP is not configured");return nodemailer.createTransport({host:config.host,port:config.port,secure:config.secure,auth:{user:config.user,pass:config.password}});}
+function value(input:unknown){return typeof input==="string"||typeof input==="number"?String(input):undefined;}
+function escapeHtml(input:string){return input.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;");}
+function message(notification:PendingNotification){const p=notification.payload,ticketNumber=value(p.ticketNumber)??notification.ticket_number??"Ticket",title=value(p.title)??notification.ticket_title,status=value(p.status)??notification.ticket_status,technician=value(p.technicianName),startedAt=value(p.startedAt),comment=value(p.comment),resolution=value(p.resolutionSummary),reason=value(p.reason),author=value(p.authorName);const names:Record<string,string>={TICKET_CREATED:"New support ticket received",TICKET_CLAIMED:"Your ticket has been claimed",TICKET_STARTED:"Your ticket is now in progress",TICKET_STATUS_CHANGED:"Ticket status updated",COMMENT_ADDED:"New public ticket update",TICKET_ESCALATED:"Ticket escalated",SUB_ISSUE_CREATED:"Sub-issue created"};const heading=names[notification.event_type]??notification.event_type.toLowerCase().replaceAll("_"," ").replace(/\b\w/g,letter=>letter.toUpperCase());const details=[title&&["Ticket title",title],status&&["Current status",status.replaceAll("_"," ")],technician&&["Technician",technician],startedAt&&["Work started",new Date(startedAt).toLocaleString("en-ZA",{timeZone:"Africa/Johannesburg"})],author&&["Updated by",author],comment&&["Update or comment",comment],resolution&&["Resolution summary",resolution],reason&&["Escalation reason",reason]].filter(Boolean) as string[][];const text=["CSIS IT Support","",heading,`Ticket: ${ticketNumber}`,...details.map(([label,item])=>`${label}: ${item}`),"","Sign in to the CSIS IT Support portal for full details.","","This is an automated notification. Please do not reply."].join("\n");const detailHtml=details.map(([label,item])=>`<tr><td style="padding:7px 12px;color:#64748b">${escapeHtml(label)}</td><td style="padding:7px 12px;font-weight:600">${escapeHtml(item)}</td></tr>`).join("");const html=`<!doctype html><html><body style="margin:0;background:#f8fafc;font-family:Arial,sans-serif;color:#172033"><div style="max-width:640px;margin:24px auto;background:white;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden"><div style="background:#4B2C70;color:white;padding:22px 28px"><strong style="font-size:20px">CSIS IT Support</strong></div><div style="padding:28px"><h1 style="font-size:22px;margin:0 0 8px">${escapeHtml(heading)}</h1><p style="color:#4B2C70;font-weight:700">${escapeHtml(ticketNumber)}</p><table style="width:100%;border-collapse:collapse;margin:18px 0;background:#f8fafc">${detailHtml}</table><p>Sign in to the CSIS IT Support portal for full details.</p><p style="margin-top:24px;color:#64748b;font-size:12px">This is an automated notification. Please do not reply.</p></div></div></body></html>`;return{subject:notification.event_type==="TICKET_STARTED"?"Your CSIS IT Support ticket has been started":`[CSIS IT Support] ${ticketNumber}: ${heading}`,text,html};}
 
-function textValue(value: unknown) {
-  return typeof value === "string" || typeof value === "number"
-    ? String(value)
-    : undefined;
-}
+export async function getEmailDeliveryStatus(){const config=configuration();const result=await pool.query(`SELECT COUNT(*) FILTER(WHERE processed_at IS NULL AND attempts<$1)::INTEGER AS pending,COUNT(*) FILTER(WHERE processed_at IS NOT NULL)::INTEGER AS sent,COUNT(*) FILTER(WHERE processed_at IS NULL AND attempts>=$1)::INTEGER AS failed,COALESCE(SUM(GREATEST(attempts-1,0)),0)::INTEGER AS "retryCount",(SELECT last_error FROM notification_outbox WHERE last_error IS NOT NULL ORDER BY created_at DESC LIMIT 1) AS "lastError" FROM notification_outbox`,[maxAttempts]);let connected=false,connectionError:string|null=null;if(config.configured){try{await transporter().verify();connected=true;}catch(error){connectionError=error instanceof Error?error.message:"SMTP connection failed";}}return{configured:config.configured,connected,host:config.host??null,port:config.port,secure:config.secure,...result.rows[0],connectionError};}
+export async function sendTestEmail(recipient:string){const config=configuration();if(!config.configured)throw new Error("SMTP is not configured");await transporter().sendMail({from:config.from,to:recipient,subject:"CSIS IT Support email test",text:"CSIS IT Support email delivery is configured correctly. This is a test message.",html:`<div style="font-family:Arial,sans-serif;max-width:600px"><h1 style="color:#4B2C70">CSIS IT Support</h1><p>Email delivery is configured correctly.</p><p>This is a test message requested by a system administrator.</p></div>`});}
 
-function createMessage(notification: PendingNotification) {
-  const ticketNumber = textValue(notification.payload.ticketNumber);
-  const title = textValue(notification.payload.title);
-  const status = textValue(notification.payload.status);
-  const technicianName = textValue(notification.payload.technicianName);
-  const eventName = notification.event_type
-    .toLowerCase()
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-  const ticketLabel = ticketNumber ? ` ${ticketNumber}` : "";
-  const details = [
-    ticketNumber && `Ticket: ${ticketNumber}`,
-    title && `Title: ${title}`,
-    status && `Status: ${status.replaceAll("_", " ")}`,
-    technicianName && `Technician: ${technicianName}`,
-  ].filter(Boolean);
-
-  return {
-    subject: `[CSIS IT Support]${ticketLabel}: ${eventName}`,
-    text: [
-      "Hello,",
-      "",
-      `There is an update to your CSIS IT support request: ${eventName}.`,
-      ...(details.length > 0 ? ["", ...details] : []),
-      "",
-      "Sign in to the CSIS IT Support portal for the latest details.",
-      "",
-      "This is an automated notification. Please do not reply.",
-    ].join("\n"),
-  };
-}
-
-export function startNotificationMailer() {
-  if (process.env.SMTP_ENABLED !== "true") {
-    console.log("Email notifications are disabled");
-    return;
-  }
-
-  const host = process.env.SMTP_HOST;
-  const user = process.env.SMTP_USER;
-  const password = process.env.SMTP_PASSWORD?.replace(/\s/g, "");
-  const from = process.env.SMTP_FROM ?? user;
-
-  if (!host || !user || !password || !from) {
-    console.error("Email notifications require SMTP_HOST, SMTP_USER, SMTP_PASSWORD, and SMTP_FROM");
-    return;
-  }
-
-  const port = Number(process.env.SMTP_PORT ?? 465);
-  const transporter = nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465,
-    auth: { user, pass: password },
-  });
-  let processing = false;
-
-  async function processNext() {
-    if (processing) return;
-    processing = true;
-
-    try {
-      const result = await pool.query<PendingNotification>(
-        `UPDATE notification_outbox
-         SET attempts = attempts + 1
-         WHERE id = (
-           SELECT id
-           FROM notification_outbox
-           WHERE processed_at IS NULL AND attempts < $1
-           ORDER BY created_at
-           LIMIT 1
-           FOR UPDATE SKIP LOCKED
-         )
-         RETURNING id, recipient_email, event_type, payload`,
-        [maxAttempts],
-      );
-      const notification = result.rows[0];
-
-      if (!notification) return;
-
-      try {
-        await transporter.sendMail({
-          from,
-          to: notification.recipient_email,
-          ...createMessage(notification),
-        });
-        await pool.query(
-          `UPDATE notification_outbox
-           SET processed_at = CURRENT_TIMESTAMP, last_error = NULL
-           WHERE id = $1`,
-          [notification.id],
-        );
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown SMTP error";
-        await pool.query(
-          `UPDATE notification_outbox SET last_error = $2 WHERE id = $1`,
-          [notification.id, message.slice(0, 1000)],
-        );
-        console.error("Email notification failed", message);
-      }
-    } catch (error) {
-      console.error("Notification worker failed", error);
-    } finally {
-      processing = false;
-    }
-  }
-
-  console.log(`Email notifications enabled for ${user}`);
-  void processNext();
-  setInterval(() => void processNext(), pollIntervalMilliseconds).unref();
+export function startNotificationMailer(){const config=configuration();if(!config.configured){console.log("SMTP is not configured; notifications will remain queued");return;}const mailer=transporter();let processing=false;async function processNext(){if(processing)return;processing=true;try{const result=await pool.query<PendingNotification>(`WITH candidate AS (SELECT id FROM notification_outbox WHERE processed_at IS NULL AND attempts<$1 ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED),claimed AS (UPDATE notification_outbox n SET attempts=n.attempts+1 FROM candidate WHERE n.id=candidate.id RETURNING n.*) SELECT claimed.id,claimed.recipient_email,claimed.event_type,claimed.payload,t.ticket_number,t.title AS ticket_title,t.status::text AS ticket_status FROM claimed LEFT JOIN tickets t ON t.id=claimed.ticket_id`,[maxAttempts]);const notification=result.rows[0];if(!notification)return;try{await mailer.sendMail({from:config.from,to:notification.recipient_email,...message(notification)});await pool.query(`UPDATE notification_outbox SET processed_at=CURRENT_TIMESTAMP,last_error=NULL WHERE id=$1 AND processed_at IS NULL`,[notification.id]);}catch(error){const description=error instanceof Error?error.message:"Unknown SMTP error";await pool.query(`UPDATE notification_outbox SET last_error=$2 WHERE id=$1 AND processed_at IS NULL`,[notification.id,description.slice(0,1000)]);console.error("Email notification failed",description);}}catch(error){console.error("Notification worker failed",error);}finally{processing=false;}}
+  console.log(`Email notifications enabled for ${config.user}`);void processNext();setInterval(()=>void processNext(),pollIntervalMilliseconds).unref();
 }

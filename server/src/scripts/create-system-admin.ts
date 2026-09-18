@@ -7,7 +7,7 @@ import { pool } from "../db.js";
 const inputSchema = z.object({
   fullName: z.string().trim().min(2).max(120),
   email: z.string().trim().toLowerCase().email().refine(
-    (email) => email.endsWith("@nwu.ac.za") || email.endsWith("@student.g.nwu.ac.za"),
+    (email) => email.endsWith("@mynwu.ac.za"),
     "ADMIN_EMAIL must be an NWU email address",
   ),
   password: z.string().min(12).max(128).regex(/[a-z]/).regex(/[A-Z]/).regex(/[0-9]/),

@@ -7,6 +7,7 @@ import {
   type AuthenticatedRequest,
 } from "../middleware/require-auth.js";
 import { z } from "zod";
+import { enqueueTicketStarted } from "../services/notification-outbox.js";
 export const technicianRouter = Router();
 
 technicianRouter.use(
@@ -236,13 +237,18 @@ technicianRouter.post(
       const ticketResult = await client.query<{
         id: string;
         ticket_number: string;
+        title: string;
         assigned_to: string | null;
         status: string;
+        reporter_email: string;
       }>(
-        `SELECT id, ticket_number, assigned_to, status
+        `SELECT tickets.id, tickets.ticket_number, tickets.title,
+                tickets.assigned_to, tickets.status,
+                reporters.email AS reporter_email
          FROM tickets
-         WHERE id = $1
-         FOR UPDATE`,
+         JOIN users AS reporters ON reporters.id = tickets.reporter_id
+         WHERE tickets.id = $1
+         FOR UPDATE OF tickets`,
         [ticketId],
       );
 
@@ -306,6 +312,17 @@ technicianRouter.post(
           }),
         ],
       );
+
+      if (ticket.status !== "IN_PROGRESS") {
+        await enqueueTicketStarted(client, {
+          ticketId: ticket.id,
+          reporterEmail: ticket.reporter_email,
+          ticketNumber: ticket.ticket_number,
+          ticketTitle: ticket.title,
+          technicianName: user.fullName,
+          startedAt: timerResult.rows[0].started_at,
+        });
+      }
 
       await client.query("COMMIT");
 
@@ -466,6 +483,7 @@ technicianRouter.patch(
       const ticketResult = await client.query<{
         id: string;
         ticket_number: string;
+        title: string;
         assigned_to: string | null;
         status: string;
         reporter_email: string;
@@ -474,6 +492,7 @@ technicianRouter.patch(
         `SELECT
            tickets.id,
            tickets.ticket_number,
+           tickets.title,
            tickets.assigned_to,
            tickets.status,
            tickets.parent_ticket_id,
@@ -549,6 +568,7 @@ technicianRouter.patch(
         status: string;
         resolution_summary: string | null;
         resolved_at: Date | null;
+        updated_at: Date;
       }>(
         `UPDATE tickets
          SET
@@ -570,7 +590,8 @@ technicianRouter.patch(
            ticket_number,
            status,
            resolution_summary,
-           resolved_at`,
+           resolved_at,
+           updated_at`,
         [ticket.id, status, resolutionSummary],
       );
 
@@ -622,25 +643,38 @@ technicianRouter.patch(
         );
       }
 
-      await client.query(
-        `INSERT INTO notification_outbox (
+      const startedNow = status === "IN_PROGRESS" && ticket.status !== "IN_PROGRESS";
+
+      if (startedNow) {
+        await enqueueTicketStarted(client, {
+          ticketId: ticket.id,
+          reporterEmail: ticket.reporter_email,
+          ticketNumber: ticket.ticket_number,
+          ticketTitle: ticket.title,
+          technicianName: user.fullName,
+          startedAt: updatedTicket.updated_at,
+        });
+      } else {
+        await client.query(
+          `INSERT INTO notification_outbox (
            ticket_id,
            recipient_email,
            event_type,
            payload
          )
          VALUES ($1, $2, 'TICKET_STATUS_CHANGED', $3::jsonb)`,
-        [
-          ticket.id,
-          ticket.reporter_email,
-          JSON.stringify({
-            ticketNumber: ticket.ticket_number,
-            status: updatedTicket.status,
-            resolutionSummary:
-              updatedTicket.resolution_summary,
-          }),
-        ],
-      );
+          [
+            ticket.id,
+            ticket.reporter_email,
+            JSON.stringify({
+              ticketNumber: ticket.ticket_number,
+              title: ticket.title,
+              status: updatedTicket.status,
+              resolutionSummary: updatedTicket.resolution_summary,
+            }),
+          ],
+        );
+      }
 
       await client.query("COMMIT");
 
