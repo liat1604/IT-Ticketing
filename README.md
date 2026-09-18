@@ -29,6 +29,7 @@ Get-Content -LiteralPath ".\server\db\migrations\001_initial_schema.sql" -Raw | 
 Get-Content -LiteralPath ".\server\db\migrations\002_auth_sessions.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
 Get-Content -LiteralPath ".\server\db\migrations\003_operational_features.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
 Get-Content -LiteralPath ".\server\db\migrations\004_ticket_sub_issues.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
+Get-Content -LiteralPath ".\server\db\migrations\005_job_cards.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
 ```
 
 Start the API in one terminal:
@@ -48,6 +49,18 @@ npm.cmd run dev
 ```
 
 Open `http://127.0.0.1:5173`.
+
+## Development administrator
+
+Create or reset the local development administrator using the credentials in
+`.env`:
+
+```powershell
+npm --prefix server run seed:dev
+```
+
+The default credentials are `dev.admin@nwu.ac.za` and `Development123!`.
+Change them locally if needed; `.env` is not committed.
 
 ## First system administrator
 
@@ -73,9 +86,12 @@ System administrators can download a password-safe JSON operational snapshot fro
 
 Backups are written under `backups/`, which is excluded from Git. Schedule this script with Windows Task Scheduler for an automated local backup routine.
 
-## Email integration boundary
+## Email notifications
 
-Notification events are written to the persistent `notification_outbox` table. Delivery is deliberately not connected to an external NWU mail relay until authorised SMTP host, sender identity, credentials and data-handling approval are supplied. No ticket contents are transmitted outside the local system by default.
+Notification events are written to the persistent `notification_outbox` table.
+To deliver them through Gmail, set `SMTP_ENABLED=true` and fill in the SMTP
+values in `.env` using a Google app password. Delivery attempts and errors are
+recorded in the outbox; failed messages are retried up to five times.
 
 ## Verification
 

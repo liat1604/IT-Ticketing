@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { LoaderCircle, LogOut, TicketCheck } from "lucide-react";
+import { LoaderCircle, LogOut } from "lucide-react";
 import { ReporterDashboard } from "@/components/reporter-dashboard";
 import { TechnicianDashboard } from "@/components/technician-dashboard";
 import type { UserRole } from "@/types";
@@ -79,9 +79,11 @@ export default function App() {
       <header className="border-b bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-[#4B2C70] text-white">
-              <TicketCheck className="size-5" />
-            </div>
+            <img
+              src="/ticket-logo.png?v=2"
+              alt="CSIS IT Support logo"
+              className="h-10 w-auto object-contain"
+            />
 
             <div>
               <p className="font-semibold">CSIS IT Support</p>
@@ -179,9 +181,11 @@ function AuthenticationPage({
     <main className="grid min-h-screen lg:grid-cols-2">
       <section className="hidden bg-[#4B2C70] p-12 text-white lg:flex lg:flex-col lg:justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex size-11 items-center justify-center rounded-xl bg-white/15">
-            <TicketCheck className="size-6" />
-          </div>
+          <img
+            src="/ticket-logo.png?v=2"
+            alt="CSIS IT Support logo"
+            className="size-11 object-contain"
+          />
 
           <div>
             <p className="font-semibold">CSIS IT Support</p>

@@ -23,7 +23,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { EscalateTicketDialog, ManualTicketDialog } from "@/components/technician-actions";
+import { EscalateTicketDialog } from "@/components/technician-actions";
+import { CreateTicketDialog } from "@/components/create-ticket-dialog";
 import { TicketDetailDialog } from "@/components/ticket-detail-dialog";
 import { TicketStatusDialog } from "@/components/ticket-status-dialog";
 import type { UserRole } from "@/types";
@@ -248,7 +249,7 @@ export function TechnicianDashboard({ userId, userRole }: { userId: string; user
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <ManualTicketDialog onCreated={async (createdMessage) => { setMessage(createdMessage); await loadQueue(); }} />
+            <CreateTicketDialog onCreated={async (ticket) => { setMessage(`${ticket.ticketNumber} was created and added to the ticket queue.`); await loadQueue(); }} />
             <Button
               type="button"
               variant="outline"

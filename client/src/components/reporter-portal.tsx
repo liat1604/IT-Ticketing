@@ -34,6 +34,14 @@ export function ReporterPortal({ section }: { section: PortalSection }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [selectedCategoryId, setSelectedCategoryId] = useState("");
+  const [selectedPriority, setSelectedPriority] = useState("MEDIUM");
+
+  const physicalHazard = categories.find((category) => String(category.id) === selectedCategoryId)?.name === "Physical Hazard";
+
+  useEffect(() => {
+    if (physicalHazard) setSelectedPriority("CRITICAL");
+  }, [physicalHazard]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -80,6 +88,8 @@ export function ReporterPortal({ section }: { section: PortalSection }) {
         }),
       });
       form.reset();
+      setSelectedCategoryId("");
+      setSelectedPriority("MEDIUM");
       setSuccess(`${result.ticket.ticketNumber} was submitted successfully.`);
       await loadData();
     } catch (caughtError) {
@@ -126,6 +136,11 @@ export function ReporterPortal({ section }: { section: PortalSection }) {
                 locations={locations}
                 submitting={submitting}
                 onSubmit={createTicket}
+                categoryId={selectedCategoryId}
+                onCategoryChange={setSelectedCategoryId}
+                priority={selectedPriority}
+                onPriorityChange={setSelectedPriority}
+                physicalHazard={physicalHazard}
               />
             </CardContent>
           </Card>
@@ -192,24 +207,34 @@ function TicketForm({
   locations,
   submitting,
   onSubmit,
+  categoryId,
+  onCategoryChange,
+  priority,
+  onPriorityChange,
+  physicalHazard,
 }: {
   categories: Category[];
   locations: Location[];
   submitting: boolean;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  categoryId: string;
+  onCategoryChange: (value: string) => void;
+  priority: string;
+  onPriorityChange: (value: string) => void;
+  physicalHazard: boolean;
 }) {
   return (
     <form className="space-y-4" onSubmit={onSubmit}>
       <div className="space-y-2">
         <Label htmlFor="categoryId">Category</Label>
-        <select id="categoryId" name="categoryId" className={selectClasses} defaultValue="" required>
+        <select id="categoryId" name="categoryId" className={selectClasses} value={categoryId} onChange={(event) => onCategoryChange(event.target.value)} required>
           <option value="" disabled>Select a category</option>
           {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
         </select>
       </div>
       <div className="space-y-2">
         <Label htmlFor="priority">Priority or urgency</Label>
-        <select id="priority" name="priority" className={selectClasses} defaultValue="MEDIUM" required>
+        <select id="priority" name="priority" className={selectClasses} value={priority} onChange={(event) => onPriorityChange(event.target.value)} disabled={physicalHazard} required>
           <option value="LOW">Low</option>
           <option value="MEDIUM">Medium</option>
           <option value="HIGH">High</option>
@@ -241,9 +266,9 @@ function TicketForm({
         <Label htmlFor="description">Issue description</Label>
         <Textarea id="description" name="description" className="min-h-28" placeholder="Explain what happened, when it started, and any troubleshooting already attempted." minLength={10} maxLength={4000} required />
       </div>
-      <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
-        Hardware safety: if you smell burning, see exposed wiring, or suspect an electrical hazard, switch off the equipment if safe, keep others away, and select Critical.
-      </p>
+      {physicalHazard && <p className="rounded-lg bg-red-50 px-3 py-2 text-xs leading-5 text-red-800">
+        Priority has been set to Critical. If there is burning, exposed wiring, or an electrical hazard, switch off the equipment only if safe, keep others away, and contact emergency or facilities support immediately.
+      </p>}
       <Button type="submit" className="w-full bg-[#4B2C70] text-white hover:bg-[#3d235d]" disabled={submitting || categories.length === 0}>
         {submitting ? <LoaderCircle className="animate-spin" /> : <Plus />}
         {submitting ? "Submitting..." : "Submit ticket"}

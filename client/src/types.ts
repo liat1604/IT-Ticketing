@@ -36,6 +36,7 @@ export type TicketSummary = {
 export type PortalSection =
   | "overview"
   | "tickets"
+  | "job-cards"
   | "calendar"
   | "reports"
   | "users"

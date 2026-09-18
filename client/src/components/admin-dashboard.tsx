@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { Activity, AlertTriangle, BarChart3, CalendarRange, DatabaseBackup, Download, Eye, GitBranch, LoaderCircle, Plus, RefreshCw, Search, ShieldCheck, TicketCheck, Timer, UserCog } from "lucide-react";
+import { Activity, AlertTriangle, BarChart3, CalendarRange, ChevronDown, DatabaseBackup, Download, Eye, GitBranch, LoaderCircle, Plus, RefreshCw, Search, ShieldCheck, TicketCheck, Timer, UserCog } from "lucide-react";
 
 import { api, formatDuration, formatValue, relativeTime } from "@/lib/api";
 import type { PortalSection, User, UserRole } from "@/types";
+import { CreateTicketDialog } from "@/components/create-ticket-dialog";
 import { TicketDetailDialog } from "@/components/ticket-detail-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 type Overview = {
   periodDays: number;
@@ -44,6 +46,9 @@ function ReportsOverview({ showReportHeading, role }: { showReportHeading: boole
   const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [downloadError, setDownloadError] = useState("");
+  const [downloading, setDownloading] = useState<"summary" | "tickets" | "technicians" | null>(null);
+  const [downloadOpen, setDownloadOpen] = useState(false);
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -72,6 +77,20 @@ function ReportsOverview({ showReportHeading, role }: { showReportHeading: boole
     return `${path}?${new URLSearchParams({ from: range.from, to: range.to })}`;
   }
 
+  async function downloadReport(kind: "summary" | "tickets" | "technicians") {
+    setDownloadOpen(false); setDownloadError(""); setDownloading(kind);
+    try {
+      if (kind === "summary") {
+        if (!data) throw new Error("Summary data is not available yet.");
+        downloadSummaryReport(data);
+      } else {
+        await downloadCsvReport(reportUrl(kind === "tickets" ? "/api/admin/reports/tickets.csv" : "/api/admin/reports/technicians.csv"), `csis-${kind}-report-${range.from}-to-${range.to}.csv`);
+      }
+    } catch (caught) {
+      setDownloadError(caught instanceof Error ? caught.message : "The report could not be downloaded.");
+    } finally { setDownloading(null); }
+  }
+
   if (loading && !data) return <LoadingPanel label="Loading operational reporting" />;
   const maximum = Math.max(1, ...(data?.byCategory.map((item) => item.value) ?? []));
   return <div className="space-y-6">
@@ -81,9 +100,10 @@ function ReportsOverview({ showReportHeading, role }: { showReportHeading: boole
         <Field label="Period"><select value={period} onChange={(event) => selectPeriod(event.target.value)} className={`${selectClasses} w-full`}><option value="30">Last 30 days</option><option value="90">Last 90 days</option><option value="365">Last year</option><option value="custom">Custom dates</option></select></Field>
         <Field label="From"><Input type="date" value={range.from} max={range.to} onChange={(event) => updateDate("from", event.target.value)} /></Field>
         <Field label="To"><Input type="date" value={range.to} min={range.from} max={todayDateInput()} onChange={(event) => updateDate("to", event.target.value)} /></Field>
-        <div className="flex flex-wrap gap-2 xl:justify-end"><Button variant="outline" disabled={!data} onClick={() => data && downloadSummaryReport(data)}><Download /> Summary CSV</Button><Button variant="outline" disabled={!range.from || !range.to} onClick={() => download(reportUrl("/api/admin/reports/tickets.csv"))}><Download /> Ticket CSV</Button><Button variant="outline" disabled={!range.from || !range.to} onClick={() => download(reportUrl("/api/admin/reports/technicians.csv"))}><Download /> Technician CSV</Button><Button variant="outline" onClick={() => void load()} disabled={loading}><RefreshCw className={loading ? "animate-spin" : ""} /> Refresh</Button></div>
+        <div className="flex flex-wrap gap-2 xl:justify-end"><DropdownMenu open={downloadOpen} onOpenChange={setDownloadOpen}><DropdownMenuTrigger render={<Button className="bg-[#4B2C70] text-white hover:bg-[#3d235d]" disabled={Boolean(downloading)||!range.from||!range.to}/>} >{downloading?<LoaderCircle className="animate-spin"/>:<Download/>}{downloading?"Generating...":"Download"}<ChevronDown/></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-[min(22rem,calc(100vw-2rem))] p-2"><ReportDownloadItem title="Summary report" description="Download summary statistics for the selected period." loading={downloading==="summary"} onClick={()=>void downloadReport("summary")}/><ReportDownloadItem title="Ticket report" description="Detailed tickets, requesters, categories, priorities, statuses, technicians, dates and resolution times." loading={downloading==="tickets"} onClick={()=>void downloadReport("tickets")}/><ReportDownloadItem title="Technician report" description="Technician workload and performance, including assigned and resolved tickets and recorded work time." loading={downloading==="technicians"} onClick={()=>void downloadReport("technicians")}/></DropdownMenuContent></DropdownMenu><Button variant="outline" onClick={() => void load()} disabled={loading}><RefreshCw className={loading ? "animate-spin" : ""} /> Refresh</Button></div>
       </CardContent>
     </Card>
+    {downloadError && <ErrorMessage>{downloadError}</ErrorMessage>}
     {error && <ErrorMessage>{error}</ErrorMessage>}
     {data && <>
       <p className="flex items-center gap-2 text-sm text-muted-foreground"><CalendarRange className="size-4" /> Reporting on {formatReportDate(data.periodStart)} to {formatReportDate(data.periodEnd)} ({data.periodDays} days)</p>
@@ -119,11 +139,12 @@ function ExtendedReports({ data }: { data: Overview }) {
 }
 
 function TicketAdministration({ role }: { role: UserRole }) {
-  const [tickets, setTickets] = useState<AdminTicket[]>([]); const [search, setSearch] = useState(""); const [status, setStatus] = useState("ALL"); const [priority, setPriority] = useState("ALL"); const [loading, setLoading] = useState(true); const [error, setError] = useState(""); const [selected, setSelected] = useState<string | null>(null);
+  const [tickets, setTickets] = useState<AdminTicket[]>([]); const [search, setSearch] = useState(""); const [status, setStatus] = useState("ALL"); const [priority, setPriority] = useState("ALL"); const [loading, setLoading] = useState(true); const [error, setError] = useState(""); const [message, setMessage] = useState(""); const [selected, setSelected] = useState<string | null>(null);
   const load = useCallback(async () => { setLoading(true); setError(""); try { const params = new URLSearchParams({ search, status, priority }); setTickets((await api<{ tickets: AdminTicket[] }>(`/api/admin/tickets?${params}`)).tickets); } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not load tickets"); } finally { setLoading(false); } }, [priority, search, status]);
   useEffect(() => { const timer = window.setTimeout(() => void load(), 200); return () => window.clearTimeout(timer); }, [load]);
-  return <div className="space-y-6"><div><h1 className="text-2xl font-semibold tracking-tight">All tickets</h1><p className="text-sm text-muted-foreground">Search and review the full operational ticket register.</p></div>
-    <Card><CardHeader><div className="grid gap-3 md:grid-cols-[1fr_190px_190px_auto]"><label className="relative"><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input value={search} onChange={(event) => setSearch(event.target.value)} className="pl-9" placeholder="Ticket, requester or email" /></label><Filter value={status} onChange={setStatus} values={["NEW","ASSIGNED","IN_PROGRESS","AWAITING_FEEDBACK","ESCALATED","RESOLVED"]} /><Filter value={priority} onChange={setPriority} values={["CRITICAL","HIGH","MEDIUM","LOW"]} /><Button variant="outline" onClick={() => void load()}><RefreshCw className={loading ? "animate-spin" : ""} /> Refresh</Button></div></CardHeader><CardContent>{error && <ErrorMessage>{error}</ErrorMessage>}{loading && tickets.length === 0 ? <LoadingPanel label="Loading tickets" /> : <ResponsiveTable headings={["Ticket","Requester","Category","Priority","Status","Assigned","Created",""]}>{tickets.map((ticket) => <tr key={ticket.id} className="border-t"><td className="px-4 py-3"><p className="font-semibold text-[#4B2C70]">{ticket.ticketNumber}</p><p className="max-w-56 truncate text-sm">{ticket.title}</p></td><td className="px-4 py-3"><p>{ticket.reporterName}</p><p className="text-xs text-muted-foreground">{ticket.reporterEmail}</p></td><td className="px-4 py-3">{ticket.category}</td><td className="px-4 py-3"><Priority priority={ticket.priority} /></td><td className="px-4 py-3"><Badge variant="secondary">{formatValue(ticket.status)}</Badge></td><td className="px-4 py-3">{ticket.technicianName ?? "Unassigned"}</td><td className="px-4 py-3 text-sm">{relativeTime(ticket.createdAt)}</td><td className="px-4 py-3"><Button size="icon" variant="ghost" aria-label={`View ${ticket.ticketNumber}`} onClick={() => setSelected(ticket.id)}><Eye /></Button></td></tr>)}</ResponsiveTable>}</CardContent></Card>
+  return <div className="space-y-6"><div className="flex flex-wrap items-center justify-between gap-4"><div><h1 className="text-2xl font-semibold tracking-tight">All tickets</h1><p className="text-sm text-muted-foreground">Search and review the full operational ticket register.</p></div><CreateTicketDialog onCreated={async (ticket) => { setMessage(`${ticket.ticketNumber} was created and added to the ticket queue.`); await load(); }} /></div>
+    {message && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700" role="status">{message}</p>}
+    <Card><CardHeader><div className="grid gap-3 md:grid-cols-[1fr_190px_190px_auto]"><label className="relative"><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input value={search} onChange={(event) => setSearch(event.target.value)} className="pl-9" placeholder="Ticket, requester or email" /></label><Filter value={status} onChange={setStatus} allLabel="All statuses" values={["NEW","ASSIGNED","IN_PROGRESS","AWAITING_FEEDBACK","ESCALATED","RESOLVED"]} /><Filter value={priority} onChange={setPriority} allLabel="All priorities" values={["CRITICAL","HIGH","MEDIUM","LOW"]} /><Button variant="outline" onClick={() => void load()}><RefreshCw className={loading ? "animate-spin" : ""} /> Refresh</Button></div></CardHeader><CardContent>{error && <ErrorMessage>{error}</ErrorMessage>}{loading && tickets.length === 0 ? <LoadingPanel label="Loading tickets" /> : <ResponsiveTable headings={["Ticket","Requester","Category","Priority","Status","Assigned","Created",""]}>{tickets.map((ticket) => <tr key={ticket.id} className="border-t"><td className="px-4 py-3"><p className="font-semibold text-[#4B2C70]">{ticket.ticketNumber}</p><p className="max-w-56 truncate text-sm">{ticket.title}</p></td><td className="px-4 py-3"><p>{ticket.reporterName}</p><p className="text-xs text-muted-foreground">{ticket.reporterEmail}</p></td><td className="px-4 py-3">{ticket.category}</td><td className="px-4 py-3"><Priority priority={ticket.priority} /></td><td className="px-4 py-3"><Badge variant="secondary">{formatValue(ticket.status)}</Badge></td><td className="px-4 py-3">{ticket.technicianName ?? "Unassigned"}</td><td className="px-4 py-3 text-sm">{relativeTime(ticket.createdAt)}</td><td className="px-4 py-3"><Button size="icon" variant="ghost" aria-label={`View ${ticket.ticketNumber}`} onClick={() => setSelected(ticket.id)}><Eye /></Button></td></tr>)}</ResponsiveTable>}</CardContent></Card>
     <TicketDetailDialog ticketId={selected} open={selected !== null} role={role} onOpenChange={(open) => !open && setSelected(null)} onChanged={load} />
   </div>;
 }
@@ -161,9 +182,24 @@ function ErrorMessage({ children }: { children: ReactNode }) { return <p classNa
 function Field({ label, children }: { label: string; children: ReactNode }) { return <div className="space-y-2"><Label>{label}</Label>{children}</div>; }
 function ResponsiveTable({ headings, children }: { headings: string[]; children: ReactNode }) { return <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left"><thead><tr className="bg-slate-50 text-xs uppercase tracking-wide text-muted-foreground">{headings.map((heading, index) => <th key={`${heading}-${index}`} className="px-4 py-3 font-medium">{heading}</th>)}</tr></thead><tbody>{children}</tbody></table></div>; }
 function Priority({ priority }: { priority: string }) { return <Badge className={priority === "CRITICAL" ? "bg-red-100 text-red-800" : priority === "HIGH" ? "bg-orange-100 text-orange-800" : "bg-slate-100 text-slate-700"}>{formatValue(priority)}</Badge>; }
-function Filter({ value, onChange, values }: { value: string; onChange: (value: string) => void; values: string[] }) { return <select value={value} onChange={(event) => onChange(event.target.value)} className={selectClasses}><option value="ALL">All</option>{values.map((item) => <option key={item} value={item}>{formatValue(item)}</option>)}</select>; }
+function Filter({ value, onChange, allLabel, values }: { value: string; onChange: (value: string) => void; allLabel: string; values: string[] }) { return <select value={value} onChange={(event) => onChange(event.target.value)} className={selectClasses} aria-label={allLabel}><option value="ALL">{allLabel}</option>{values.map((item) => <option key={item} value={item}>{formatValue(item)}</option>)}</select>; }
 function summariseChange(value: Record<string, unknown> | null) { if (!value) return "—"; return Object.entries(value).slice(0, 4).map(([key, item]) => `${formatValue(key)}: ${String(item)}`).join(" · "); }
 function download(url: string) { const anchor = document.createElement("a"); anchor.href = url; anchor.download = ""; document.body.appendChild(anchor); anchor.click(); anchor.remove(); }
+function ReportDownloadItem({ title, description, loading, onClick }: { title: string; description: string; loading: boolean; onClick: () => void }) {
+  return <DropdownMenuItem className="items-start gap-3 p-3" onClick={onClick} disabled={loading}><span className="mt-0.5 rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-bold text-[#4B2C70]">CSV</span><span className="min-w-0"><span className="flex items-center gap-2 font-medium">{title}{loading&&<LoaderCircle className="size-3.5 animate-spin"/>}</span><span className="mt-0.5 block whitespace-normal text-xs leading-5 text-muted-foreground">{description}</span></span></DropdownMenuItem>;
+}
+async function downloadCsvReport(url: string, fallbackFilename: string) {
+  const response = await fetch(url, { credentials: "include" });
+  if (!response.ok) {
+    const result = await response.json().catch(() => null) as { error?: string } | null;
+    throw new Error(result?.error ?? "The report could not be generated.");
+  }
+  const blobUrl = URL.createObjectURL(await response.blob());
+  const disposition = response.headers.get("content-disposition") ?? "";
+  const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1] ?? fallbackFilename;
+  const anchor = document.createElement("a"); anchor.href = blobUrl; anchor.download = filename; document.body.appendChild(anchor); anchor.click(); anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(blobUrl), 0);
+}
 function downloadSummaryReport(data: Overview) {
   const rows: Array<Array<string | number>> = [
     ["Section", "Item", "Value", "Detail"],
