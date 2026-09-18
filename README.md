@@ -34,6 +34,7 @@ Get-Content -LiteralPath ".\server\db\migrations\006_ticket_started_notification
 Get-Content -LiteralPath ".\server\db\migrations\007_job_card_walk_ins.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
 Get-Content -LiteralPath ".\server\db\migrations\007_password_resets.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
 Get-Content -LiteralPath ".\server\db\migrations\008_email_verification.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
+Get-Content -LiteralPath ".\server\db\migrations\009_immutable_audit_events.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
 npm --prefix server run seed-demo
 ```
 
@@ -166,7 +167,7 @@ and does not create a session. Links expire in 24 hours and are single-use;
 users can request another from **Resend verification email** on the sign-in page.
 Password resets do not bypass email verification.
 
-Apply migrations 006, 007 and 008 after the earlier migrations, before starting
+Apply migrations 006 through 009 after the earlier migrations, before starting
 the updated server. Apply 008 once: it preserves access for existing accounts.
 New accounts default to unverified. Development seeds and the system-admin
 bootstrap explicitly provision trusted accounts with access.
@@ -175,6 +176,7 @@ bootstrap explicitly provision trusted accounts with access.
 Get-Content -LiteralPath ".\server\db\migrations\006_ticket_started_notification.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
 Get-Content -LiteralPath ".\server\db\migrations\007_password_resets.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
 Get-Content -LiteralPath ".\server\db\migrations\008_email_verification.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
+Get-Content -LiteralPath ".\server\db\migrations\009_immutable_audit_events.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
 ```
 
 Set `APP_BASE_URL` to the externally accessible frontend URL and configure
@@ -182,3 +184,7 @@ Set `APP_BASE_URL` to the externally accessible frontend URL and configure
 The API's existing notification worker delivers verification emails through SMTP.
 Without SMTP configuration, emails remain queued and new users cannot verify.
 Run `npm --prefix server test` for the authentication integration tests.
+
+Audit events are append-only. PostgreSQL rejects direct `UPDATE`, `DELETE` and
+`TRUNCATE` operations on `audit_events`, and historical actor/ticket UUIDs
+remain in the audit row even after the referenced record is removed.

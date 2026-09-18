@@ -13,7 +13,6 @@ let baseUrl = "";
 const userIds: string[] = [];
 const emails: string[] = [];
 const ticketIds: string[] = [];
-const auditIds: string[] = [];
 
 before(async () => {
   const app = express();
@@ -31,7 +30,6 @@ before(async () => {
 });
 
 after(async () => {
-  await pool.query(`DELETE FROM audit_events WHERE actor_id = ANY($1::uuid[]) OR id = ANY($2::bigint[])`, [userIds, auditIds]);
   await pool.query(`DELETE FROM notification_outbox WHERE recipient_email = ANY($1::text[])`, [emails]);
   await pool.query(`DELETE FROM tickets WHERE id = ANY($1::uuid[])`, [ticketIds]);
   await pool.query(`DELETE FROM users WHERE id = ANY($1::uuid[])`, [userIds]);
@@ -77,7 +75,6 @@ test("deleting an unused account removes access and tokens while preserving audi
   const admin = await account("ADMIN");
   const target = await account();
   const audit = await pool.query<{ id: string }>(`INSERT INTO audit_events(actor_id, action) VALUES($1,'LOGIN_SUCCESS') RETURNING id`, [target.id]);
-  auditIds.push(audit.rows[0].id);
   for (const table of ["email_verification_tokens", "password_reset_tokens"]) {
     await pool.query(`INSERT INTO ${table}(user_id, token_hash, expires_at) VALUES($1,$2,CURRENT_TIMESTAMP + INTERVAL '1 hour')`, [target.id, randomUUID()]);
   }
@@ -90,8 +87,8 @@ test("deleting an unused account removes access and tokens while preserving audi
   assert.equal((await pool.query(`SELECT 1 FROM notification_outbox WHERE recipient_email=$1`, [target.email])).rowCount, 0);
   assert.equal((await fetch(`${baseUrl}/api/auth/me`, { headers: { cookie: target.cookie } })).status, 401);
   const preserved = await pool.query(`SELECT actor_id, previous_values FROM audit_events WHERE id=$1`, [audit.rows[0].id]);
-  assert.equal(preserved.rows[0].actor_id, null);
-  assert.equal(preserved.rows[0].previous_values.deletedActor.id, target.id);
+  assert.equal(preserved.rows[0].actor_id, target.id);
+  assert.equal(preserved.rows[0].previous_values, null);
   const deletion = await pool.query(`SELECT 1 FROM audit_events WHERE actor_id=$1 AND action='USER_DELETED_BY_ADMIN' AND previous_values->>'userId'=$2`, [admin.id, target.id]);
   assert.equal(deletion.rowCount, 1);
   assert.equal((await remove(target.id, admin.cookie)).status, 404);
@@ -101,7 +98,6 @@ test("linked tickets block deletion and roll back all changes", async () => {
   const admin = await account("ADMIN");
   const target = await account();
   const audit = await pool.query<{ id: string }>(`INSERT INTO audit_events(actor_id, action) VALUES($1,'LOGIN_SUCCESS') RETURNING id`, [target.id]);
-  auditIds.push(audit.rows[0].id);
   const category = await pool.query(`SELECT id FROM categories ORDER BY id LIMIT 1`);
   const ticket = await pool.query<{ id: string }>(`INSERT INTO tickets(reporter_id,created_by,category_id,title,description,priority,status,source) VALUES($1,$1,$2,'Deletion test','Preserve this ticket','MEDIUM','NEW','WEB') RETURNING id`, [target.id, category.rows[0].id]);
   ticketIds.push(ticket.rows[0].id);

@@ -568,15 +568,9 @@ adminRouter.delete("/users/:userId", async (request, response) => {
       response.status(409).json({ error: "This account has linked operational history. Deactivate it instead to preserve those records." });
       return;
     }
-    // Keep historical audit events and their actor identity after removing the account.
-    await client.query(
-      `UPDATE audit_events SET actor_id = NULL,
-         previous_values = COALESCE(previous_values, '{}'::jsonb) || jsonb_build_object('deletedActor', $2::jsonb)
-       WHERE actor_id = $1`,
-      [user.id, JSON.stringify({ id: user.id, fullName: user.full_name, email: user.email })],
-    );
-    // Other operational foreign keys deliberately prevent deletion, including tickets,
-    // comments, time entries, job cards and events created by this user.
+    // Audit rows retain the deleted actor UUID and are immutable. The deletion
+    // event below captures the actor's identifying details before the account
+    // is removed; other operational foreign keys still protect linked history.
     await client.query(`DELETE FROM users WHERE id = $1`, [user.id]);
     await client.query(
       `DELETE FROM notification_outbox WHERE LOWER(recipient_email) = LOWER($1)
