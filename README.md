@@ -65,7 +65,7 @@ Create or reset the local development administrator using the credentials in
 npm --prefix server run seed:dev
 ```
 
-The default credentials are `dev.admin@nwu.ac.za` and `Development123!`.
+The default credentials are `dev.admin@mynwu.ac.za` and `Development123!`.
 Change them locally if needed; `.env` is not committed.
 
 ## Demo accounts
@@ -79,10 +79,10 @@ npm --prefix server run seed-demo
 
 | Role | Name | Email | Password |
 | --- | --- | --- | --- |
-| System administrator | Selouna Visser | `selouna.visser@nwu.ac.za` | `SystemAdmin2026!` |
-| Administrator | Development Administrator | `dev.admin@nwu.ac.za` | `Development123!` |
-| Technician | Sebastian Klopper | `sebastian.klopper@nwu.ac.za` | `TechDemo2026!` |
-| Student / reporter | Amina Dlamini | `amina.dlamini@student.g.nwu.ac.za` | `StudentDemo2026!` |
+| System administrator | Selouna Visser | `selouna.visser@mynwu.ac.za` | `SystemAdmin2026!` |
+| Administrator | Development Administrator | `dev.admin@mynwu.ac.za` | `Development123!` |
+| Technician | Sebastian Klopper | `sebastian.klopper@mynwu.ac.za` | `TechDemo2026!` |
+| Student / reporter | Amina Dlamini | `amina.dlamini@mynwu.ac.za` | `StudentDemo2026!` |
 
 These fixed credentials are for local demonstrations only. The seed command is
 blocked when `NODE_ENV=production`.
@@ -99,7 +99,7 @@ Set temporary environment values in the server terminal, run the bootstrap comma
 
 ```powershell
 $env:ADMIN_FULL_NAME = "Your Name"
-$env:ADMIN_EMAIL = "your.name@nwu.ac.za"
+$env:ADMIN_EMAIL = "your.name@mynwu.ac.za"
 $env:ADMIN_PASSWORD = "Use-A-Unique-Password-2026"
 npm.cmd run create-admin
 Remove-Item Env:ADMIN_PASSWORD

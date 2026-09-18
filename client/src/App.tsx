@@ -283,7 +283,7 @@ function AuthenticationPage({
                   name="email"
                   type="email"
                   autoComplete="email"
-                  placeholder="name@student.g.nwu.ac.za"
+                  placeholder="name@mynwu.ac.za"
                   required
                 />
               </div>

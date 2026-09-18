@@ -346,7 +346,7 @@ def build_story():
             Spacer(1, 12 * mm),
             callout(
                 "Start here",
-                "Open the CSIS IT Support portal in your browser and sign in with your NWU email address. Students and staff may register a reporter account from the login page. Technician and administrator accounts are provisioned by an administrator.",
+                "Open the CSIS IT Support portal in your browser and sign in with your @mynwu.ac.za email address. Students and staff may register a reporter account from the login page. Technician and administrator accounts are provisioned by an administrator.",
                 colors.HexColor("#FFFFFF"),
                 colors.HexColor("#D8CBE6"),
             ),
@@ -360,7 +360,7 @@ def build_story():
     story.extend(section_title("1. Reporter quick start", "Use the reporter portal to submit faults and follow every update through resolution."))
     story.extend(
         [
-            step(1, "Sign in or register", "Use a valid @nwu.ac.za or @student.g.nwu.ac.za address. New passwords must be at least 12 characters and include uppercase, lowercase, and a number."),
+            step(1, "Sign in or register", "Use a valid @mynwu.ac.za address. New passwords must be at least 12 characters and include uppercase, lowercase, and a number."),
             step(2, "Submit a ticket", "Choose the issue category and urgency, identify the building, room, station, or asset, and describe what happened and what you already tried."),
             step(3, "Track progress", "Open My tickets to view status, assigned technician, recorded work, escalation details, sub-issues, and the complete activity history."),
             step(4, "Reply to support", "Use the public conversation thread when a technician asks for information. Reporter messages are visible to the support team."),
@@ -422,7 +422,7 @@ def build_story():
             bullet("Review technician workload, handled tickets, walk-ins, recorded time, and average resolution."),
             bullet("Download summary, ticket, and technician reports for the selected period."),
             p("Users and access", "h2"),
-            bullet("Create reporter, technician, and administrator accounts using valid NWU email addresses."),
+            bullet("Create reporter, technician, and administrator accounts using valid @mynwu.ac.za email addresses."),
             bullet("Change roles, activate or deactivate accounts, and reset temporary passwords."),
             bullet("System administrators can grant the System Administrator role and export an operational backup."),
             p("Calendar and audit", "h2"),
@@ -443,7 +443,7 @@ def build_story():
     story.extend(section_title("4. Frequently asked questions"))
     story.extend(
         [
-            faq_block("Who can create a reporter account?", "Students and staff with a valid NWU email address can register on the login page. Technician and administrator access must be provisioned by an administrator."),
+            faq_block("Who can create a reporter account?", "Students and staff with a valid @mynwu.ac.za email address can register on the login page. Technician and administrator access must be provisioned by an administrator."),
             faq_block("Why can I not see an internal note?", "Internal notes are intentionally restricted to technicians and administrators. Reporters only see public comments and appropriate workflow history."),
             faq_block("Why can I not resolve a ticket?", "Only the assigned technician or an administrator may manage the workflow. A resolution summary is required, active timers are stopped automatically, and all child issues must be resolved first."),
             faq_block("What should be escalated to Central IT?", "Escalate issues that require central identity, network, infrastructure, or access privileges beyond the CSIS support team's authority. Record the reason and external service-desk reference."),
