@@ -134,3 +134,15 @@ Set-Location -LiteralPath "..\client"
 npm.cmd run build
 npm.cmd run lint
 ```
+
+## User guide
+
+The login page includes a public FAQ and downloads the generated onboarding
+guide through `GET /api/resources/user-guide`. Regenerate the PDF after changing
+the guide source:
+
+```powershell
+python .\scripts\generate-user-guide.py
+```
+
+The generated file is written to `output/pdf/csis-it-support-user-guide.pdf`.
