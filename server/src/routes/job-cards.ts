@@ -33,6 +33,7 @@ const optionalEmailSchema = z
   .nullable()
   .optional()
   .transform((email) => email || null);
+const jobCardReasonSchema = z.string().trim().min(5).max(2000);
 
 const createSchema = z
   .object({
@@ -497,6 +498,129 @@ jobCardsRouter.post("/:id/complete", async (request, response) => {
   }
 });
 
+jobCardsRouter.post("/:id/escalate", async (request, response) => {
+  const parsed = idSchema.safeParse(request.params.id);
+  const reason = jobCardReasonSchema.safeParse(request.body?.reason);
+  if (!parsed.success || !reason.success) {
+    response.status(400).json({
+      error: "An escalation reason of at least 5 characters is required",
+    });
+    return;
+  }
+
+  const actor = user(request);
+  const card = await loadManaged(parsed.data, actor);
+  if (!card) {
+    response.status(403).json({ error: "You cannot escalate this job card" });
+    return;
+  }
+  if (card.primary_ticket_id) {
+    response.status(400).json({
+      error: "Use the linked ticket escalation workflow for ticket job cards",
+    });
+    return;
+  }
+  if (["COMPLETED", "CANCELLED", "ESCALATED"].includes(card.status)) {
+    response.status(409).json({ error: "This job card cannot be escalated" });
+    return;
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      `UPDATE time_entries
+       SET stopped_at = CURRENT_TIMESTAMP
+       WHERE job_card_id = $1 AND stopped_at IS NULL`,
+      [card.id],
+    );
+    await client.query(
+      `UPDATE job_cards
+       SET status = 'ESCALATED', updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [card.id],
+    );
+    await client.query(
+      `INSERT INTO audit_events (ticket_id, actor_id, action, new_values)
+       VALUES (NULL, $1, 'JOB_CARD_ESCALATED', $2::jsonb)`,
+      [
+        actor.id,
+        JSON.stringify({ jobCardId: card.id, reason: reason.data, source: "WALK_IN" }),
+      ],
+    );
+    await client.query("COMMIT");
+    response.json({ ok: true });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Walk-in job-card escalation failed", error);
+    response.status(500).json({ error: "Could not escalate job card" });
+  } finally {
+    client.release();
+  }
+});
+
+jobCardsRouter.post("/:id/end", async (request, response) => {
+  const parsed = idSchema.safeParse(request.params.id);
+  const note = jobCardReasonSchema.safeParse(request.body?.endNote);
+  if (!parsed.success || !note.success) {
+    response.status(400).json({
+      error: "An end note of at least 5 characters is required",
+    });
+    return;
+  }
+
+  const actor = user(request);
+  const card = await loadManaged(parsed.data, actor);
+  if (!card) {
+    response.status(403).json({ error: "You cannot end this job card" });
+    return;
+  }
+  if (card.primary_ticket_id) {
+    response.status(400).json({
+      error: "Use the linked ticket workflow for ticket job cards",
+    });
+    return;
+  }
+  if (["COMPLETED", "CANCELLED"].includes(card.status)) {
+    response.status(409).json({ error: "This job card has already ended" });
+    return;
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      `UPDATE time_entries
+       SET stopped_at = CURRENT_TIMESTAMP
+       WHERE job_card_id = $1 AND stopped_at IS NULL`,
+      [card.id],
+    );
+    await client.query(
+      `UPDATE job_cards
+       SET status = 'CANCELLED', completion_note = $2,
+           completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [card.id, note.data],
+    );
+    await client.query(
+      `INSERT INTO audit_events (ticket_id, actor_id, action, new_values)
+       VALUES (NULL, $1, 'JOB_CARD_ENDED', $2::jsonb)`,
+      [
+        actor.id,
+        JSON.stringify({ jobCardId: card.id, endNote: note.data, source: "WALK_IN" }),
+      ],
+    );
+    await client.query("COMMIT");
+    response.json({ ok: true });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Walk-in job-card end failed", error);
+    response.status(500).json({ error: "Could not end job card" });
+  } finally {
+    client.release();
+  }
+});
+
 jobCardsRouter.patch("/:id/checklist/:itemId", async (request, response) => {
   const id = idSchema.safeParse(request.params.id);
   const item = idSchema.safeParse(request.params.itemId);
@@ -571,6 +695,7 @@ jobCardsRouter.get("/:id", async (request, response) => {
     `SELECT
        jc.id, jc.job_number AS "jobNumber", jc.title, jc.description,
        jc.status, jc.scheduled_at AS "scheduledAt", jc.target_at AS "targetAt",
+       jc.completion_note AS "completionNote", jc.completed_at AS "completedAt",
        jc.created_at AS "createdAt", jc.updated_at AS "updatedAt",
        jc.station_reference AS "stationReference",
        t.id AS "ticketId", t.ticket_number AS "ticketNumber", t.title AS "ticketTitle",

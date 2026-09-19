@@ -9,11 +9,13 @@ import {
 import {
   CheckCircle2,
   Clock3,
+  CircleStop,
   LoaderCircle,
   Pause,
   Play,
   Plus,
   Search,
+  ShieldAlert,
 } from "lucide-react";
 
 import { TicketDetailDialog } from "@/components/ticket-detail-dialog";
@@ -57,6 +59,8 @@ type JobCard = {
   activeTimerStartedAt: string | null;
   scheduledAt: string | null;
   targetAt: string | null;
+  completionNote: string | null;
+  completedAt: string | null;
   location: string | null;
   stationReference: string | null;
   createdAt: string;
@@ -121,6 +125,59 @@ type JobCardForm = {
   walkInReporterEmail: string;
 };
 
+const badgePalette = {
+  pending: "border-[#DC2626] bg-[#FEE2E2] text-[#991B1B]",
+  progress: "border-[#D97706] bg-[#FEF3C7] text-[#92400E]",
+  resolved: "border-[#16A34A] bg-[#DCFCE7] text-[#166534]",
+  neutral: "border-[#64748B] bg-[#F1F5F9] text-[#475569]",
+  brand: "border-[#4B2C70] bg-[#F3E8FF] text-[#4B2C70]",
+} as const;
+
+const kanbanColumns = [
+  {
+    status: "SCHEDULED",
+    label: "Pending",
+    helper: "Ready to be started",
+    className: "border-[#FECACA] bg-[#FEF2F2]",
+    badgeClass: badgePalette.pending,
+  },
+  {
+    status: "LIVE",
+    label: "In progress",
+    helper: "Technician timer running",
+    className: "border-[#FDE68A] bg-[#FFFBEB]",
+    badgeClass: badgePalette.progress,
+  },
+  {
+    status: "PAUSED",
+    label: "Paused",
+    helper: "Waiting to resume",
+    className: "border-[#CBD5E1] bg-[#F8FAFC]",
+    badgeClass: badgePalette.neutral,
+  },
+  {
+    status: "ESCALATED",
+    label: "Escalated",
+    helper: "Needs supervisor attention",
+    className: "border-[#FECACA] bg-[#FEF2F2]",
+    badgeClass: badgePalette.pending,
+  },
+  {
+    status: "COMPLETED",
+    label: "Resolved",
+    helper: "Work completed",
+    className: "border-[#BBF7D0] bg-[#F0FDF4]",
+    badgeClass: badgePalette.resolved,
+  },
+  {
+    status: "CANCELLED",
+    label: "Cancelled",
+    helper: "No longer active",
+    className: "border-[#CBD5E1] bg-[#F8FAFC]",
+    badgeClass: badgePalette.neutral,
+  },
+] as const;
+
 export function JobCardsDashboard({
   user,
   onActiveCountChange,
@@ -148,7 +205,7 @@ export function JobCardsDashboard({
       setCards(result.jobCards);
       onActiveCountChange(
         result.jobCards.filter((card) =>
-          ["SCHEDULED", "LIVE", "PAUSED"].includes(card.status),
+          ["SCHEDULED", "LIVE", "PAUSED", "ESCALATED"].includes(card.status),
         ).length,
       );
     } catch (caught) {
@@ -171,7 +228,7 @@ export function JobCardsDashboard({
   const counts = useMemo(
     () =>
       Object.fromEntries(
-        ["LIVE", "SCHEDULED", "PAUSED", "COMPLETED"].map((value) => [
+        ["LIVE", "SCHEDULED", "PAUSED", "ESCALATED", "COMPLETED"].map((value) => [
           value,
           cards.filter((card) => card.status === value).length,
         ]),
@@ -198,8 +255,8 @@ export function JobCardsDashboard({
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Badge className="bg-purple-100 text-[#4B2C70]">
-            {counts.LIVE + counts.SCHEDULED + counts.PAUSED} active
+          <Badge className={badgePalette.brand}>
+            {counts.LIVE + counts.SCHEDULED + counts.PAUSED + counts.ESCALATED} active
           </Badge>
           <Button
             className="bg-[#4B2C70] text-white hover:bg-[#3d235d]"
@@ -210,11 +267,15 @@ export function JobCardsDashboard({
         </div>
       </div>
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        <Stat label="Active" value={counts.LIVE + counts.SCHEDULED + counts.PAUSED} />
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
+        <Stat
+          label="Active"
+          value={counts.LIVE + counts.SCHEDULED + counts.PAUSED + counts.ESCALATED}
+        />
         <Stat label="Live" value={counts.LIVE} />
         <Stat label="Scheduled" value={counts.SCHEDULED} />
         <Stat label="Paused" value={counts.PAUSED} />
+        <Stat label="Escalated" value={counts.ESCALATED} />
         <Stat label="Completed" value={counts.COMPLETED} />
         <Stat label="Overdue" value={overdue} />
       </section>
@@ -224,7 +285,7 @@ export function JobCardsDashboard({
           <div className="bg-[#4B2C70] p-5 text-white">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <Badge className="bg-emerald-400 text-emerald-950">LIVE</Badge>
+                <Badge className={badgePalette.progress}>LIVE</Badge>
                 <p className="mt-3 text-sm text-purple-200">
                   {live.jobNumber} · {live.category.toUpperCase()}
                 </p>
@@ -271,7 +332,14 @@ export function JobCardsDashboard({
               onChange={(event) => setStatus(event.target.value)}
             >
               <option value="ALL">All statuses</option>
-              {["SCHEDULED", "LIVE", "PAUSED", "COMPLETED", "CANCELLED"].map(
+              {[
+                "SCHEDULED",
+                "LIVE",
+                "PAUSED",
+                "ESCALATED",
+                "COMPLETED",
+                "CANCELLED",
+              ].map(
                 (item) => (
                   <option key={item}>{item}</option>
                 ),
@@ -284,35 +352,69 @@ export function JobCardsDashboard({
           {loading ? (
             <Loading />
           ) : (
-            <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-              {cards.map((card) => (
-                <button
-                  key={card.id}
-                  onClick={() => setSelected(card.id)}
-                  className="rounded-xl border bg-white p-4 text-left transition hover:border-purple-300 hover:shadow-sm"
-                >
-                  <div className="flex justify-between gap-2">
-                    <Status status={card.status} />
-                    <Priority value={card.priority} />
-                  </div>
-                  <p className="mt-3 text-xs font-semibold text-[#4B2C70]">
-                    {card.jobNumber} · {card.category.toUpperCase()}
-                  </p>
-                  <h3 className="mt-1 font-semibold">{card.title}</h3>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    {card.ticketNumber
-                      ? `${card.ticketNumber} · ${card.reporterName}`
-                      : `Walk-in · ${card.reporterName}`}
-                  </p>
-                  <p className="mt-3 text-sm">{card.technicianName}</p>
-                  <div className="mt-3 flex justify-between text-xs text-muted-foreground">
-                    <span>{card.location ?? "No location"}</span>
-                    <span className="font-mono">
-                      {formatDuration(elapsed(card, now))}
-                    </span>
-                  </div>
-                </button>
-              ))}
+            <div className="overflow-x-auto pb-3">
+              <div className="grid min-w-[1400px] grid-cols-5 gap-4">
+                {kanbanColumns.map((column) => {
+                  const columnCards = cards.filter(
+                    (card) => card.status === column.status,
+                  );
+                  return (
+                    <section
+                      key={column.status}
+                      className={`min-h-80 overflow-hidden rounded-2xl border ${column.className}`}
+                      aria-label={`${column.label} job cards`}
+                    >
+                      <header className="flex items-start justify-between gap-3 border-b p-4">
+                        <div>
+                          <h3 className="font-semibold">{column.label}</h3>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {column.helper}
+                          </p>
+                        </div>
+                        <Badge className={column.badgeClass}>
+                          {columnCards.length}
+                        </Badge>
+                      </header>
+                      <div className="min-h-56 space-y-3 p-3">
+                        {columnCards.length === 0 ? (
+                          <div className="rounded-xl border border-dashed border-slate-300 bg-white/60 p-4 text-center text-xs text-muted-foreground">
+                            No job cards
+                          </div>
+                        ) : (
+                          columnCards.map((card) => (
+                            <button
+                              key={card.id}
+                              onClick={() => setSelected(card.id)}
+                              className="w-full rounded-xl border bg-white p-4 text-left transition hover:border-[#4B2C70] hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4B2C70]/40"
+                            >
+                              <div className="flex justify-between gap-2">
+                                <Status status={card.status} />
+                                <Priority value={card.priority} />
+                              </div>
+                              <p className="mt-3 text-xs font-semibold text-[#4B2C70]">
+                                {card.jobNumber} · {card.category.toUpperCase()}
+                              </p>
+                              <h3 className="mt-1 font-semibold">{card.title}</h3>
+                              <p className="mt-2 text-sm text-muted-foreground">
+                                {card.ticketNumber
+                                  ? `${card.ticketNumber} · ${card.reporterName}`
+                                  : `Walk-in · ${card.reporterName}`}
+                              </p>
+                              <p className="mt-3 text-sm">{card.technicianName}</p>
+                              <div className="mt-3 flex justify-between text-xs text-muted-foreground">
+                                <span>{card.location ?? "No location"}</span>
+                                <span className="font-mono">
+                                  {formatDuration(elapsed(card, now))}
+                                </span>
+                              </div>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </section>
+                  );
+                })}
+              </div>
             </div>
           )}
         </CardContent>
@@ -752,6 +854,8 @@ function JobCardDetail({
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
   const [ticketOpen, setTicketOpen] = useState(false);
+  const [resolutionOpen, setResolutionOpen] = useState(false);
+  const [completionNote, setCompletionNote] = useState("");
 
   const load = useCallback(async () => {
     if (id) {
@@ -763,8 +867,13 @@ function JobCardDetail({
     void load();
   }, [load]);
 
+  useEffect(() => {
+    setResolutionOpen(false);
+    setCompletionNote("");
+  }, [id]);
+
   async function action(path: string, body?: unknown) {
-    if (!id) return;
+    if (!id) return false;
     setError("");
     try {
       await api(`/api/job-cards/${id}/${path}`, {
@@ -773,8 +882,22 @@ function JobCardDetail({
       });
       await load();
       await onChanged();
+      return true;
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Action failed");
+      return false;
+    }
+  }
+
+  async function completeJobCard() {
+    const trimmed = completionNote.trim();
+    if (trimmed.length < 5) {
+      setError("Enter a completion note of at least 5 characters.");
+      return;
+    }
+    if (await action("complete", { completionNote: trimmed })) {
+      setCompletionNote("");
+      setResolutionOpen(false);
     }
   }
 
@@ -799,7 +922,7 @@ function JobCardDetail({
                     {card.jobNumber}
                   </span>
                   {card.isWalkIn && (
-                    <Badge className="bg-amber-100 text-amber-900">Walk-in</Badge>
+                    <Badge className={badgePalette.progress}>Walk-in</Badge>
                   )}
                 </div>
                 <DialogTitle className="text-xl">{card.title}</DialogTitle>
@@ -841,23 +964,77 @@ function JobCardDetail({
                             <Play /> Resume
                           </Button>
                         )}
+                        {card.isWalkIn &&
+                          !["COMPLETED", "CANCELLED", "ESCALATED"].includes(
+                            card.status,
+                          ) && (
+                            <Button
+                              variant="outline"
+                              onClick={() => {
+                                const reason = window.prompt(
+                                  "Why does this walk-in job need escalation?",
+                                );
+                                if (reason) {
+                                  void action("escalate", { reason });
+                                }
+                              }}
+                            >
+                              <ShieldAlert /> Escalate
+                            </Button>
+                          )}
+                        {card.isWalkIn &&
+                          !["COMPLETED", "CANCELLED"].includes(card.status) && (
+                            <Button
+                              variant="destructive"
+                              onClick={() => {
+                                const endNote = window.prompt(
+                                  "Why is this walk-in job being ended?",
+                                );
+                                if (endNote) {
+                                  void action("end", { endNote });
+                                }
+                              }}
+                            >
+                              <CircleStop /> End job
+                            </Button>
+                          )}
                         {!["COMPLETED", "CANCELLED"].includes(card.status) && (
                           <Button
                             variant="outline"
-                            onClick={() => {
-                              const completionNote = window.prompt(
-                                "Enter a short completion note:",
-                              );
-                              if (completionNote) {
-                                void action("complete", { completionNote });
-                              }
-                            }}
+                            onClick={() => setResolutionOpen((open) => !open)}
                           >
-                            <CheckCircle2 /> Complete
+                            <CheckCircle2 />
+                            {card.isWalkIn ? "Mark resolved" : "Complete"}
                           </Button>
                         )}
                       </div>
                     )}
+                    {canManage &&
+                      resolutionOpen &&
+                      !["COMPLETED", "CANCELLED"].includes(card.status) && (
+                        <div className="mt-4 space-y-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                          <Label htmlFor="completion-note">Resolution note</Label>
+                          <Textarea
+                            id="completion-note"
+                            value={completionNote}
+                            onChange={(event) => setCompletionNote(event.target.value)}
+                            placeholder="Describe what was completed or verified"
+                            maxLength={2000}
+                          />
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              onClick={() => setResolutionOpen(false)}
+                            >
+                              Cancel
+                            </Button>
+                            <Button type="button" onClick={() => void completeJobCard()}>
+                              <CheckCircle2 /> Confirm resolved
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                   </CardContent>
                 </Card>
                 <div className="space-y-1 text-sm">
@@ -883,6 +1060,11 @@ function JobCardDetail({
                     <strong>Target:</strong>{" "}
                     {card.targetAt ? new Date(card.targetAt).toLocaleString() : "—"}
                   </p>
+                  {card.completionNote && (
+                    <p>
+                      <strong>Resolution:</strong> {card.completionNote}
+                    </p>
+                  )}
                   {card.ticketId && (
                     <Button
                       className="mt-3"
@@ -1020,23 +1202,21 @@ function Stat({ label, value }: { label: string; value: number }) {
 
 function Status({ status }: { status: string }) {
   const style =
-    status === "LIVE" || status === "COMPLETED"
-      ? "bg-emerald-100 text-emerald-800"
-      : status === "PAUSED"
-        ? "bg-amber-100 text-amber-900"
-        : status === "SCHEDULED"
-          ? "bg-cyan-100 text-cyan-900"
-          : "bg-slate-100 text-slate-700";
+    status === "COMPLETED"
+      ? badgePalette.resolved
+      : status === "LIVE"
+        ? badgePalette.progress
+        : status === "SCHEDULED" || status === "ESCALATED"
+          ? badgePalette.pending
+          : badgePalette.neutral;
   return <Badge className={style}>{formatValue(status)}</Badge>;
 }
 
 function Priority({ value }: { value: string }) {
   const style =
-    value === "CRITICAL"
-      ? "bg-red-100 text-red-800"
-      : value === "HIGH"
-        ? "bg-orange-100 text-orange-800"
-        : "bg-slate-100 text-slate-700";
+    value === "CRITICAL" || value === "HIGH"
+      ? badgePalette.pending
+      : badgePalette.neutral;
   return <Badge className={style}>{formatValue(value)}</Badge>;
 }
 
