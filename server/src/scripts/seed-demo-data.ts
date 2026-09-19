@@ -259,6 +259,7 @@ async function main() {
     if (!reporterId) throw new Error("The seeded student reporter account is required");
     const reporter = { id: reporterId, email: reporterEmail };
 
+    const ticketIds = new Map<string, string>();
     for (const ticket of tickets) {
       const technicianId = ticket.technicianEmail
         ? userIds.get(ticket.technicianEmail) ?? null
@@ -331,6 +332,7 @@ async function main() {
       );
       const seeded = ticketResult.rows[0];
       if (!seeded) throw new Error(`Could not seed ${ticket.key}`);
+      ticketIds.set(ticket.key, seeded.id);
 
       await client.query(
         `INSERT INTO audit_events (ticket_id, actor_id, action, new_values, created_at)
@@ -389,6 +391,122 @@ async function main() {
       );
     }
 
+    const technicianId = userIds.get("sebastian.klopper@mynwu.ac.za");
+    const linkedTicketId = ticketIds.get("DEMO-PROJECTOR-G14");
+    if (!technicianId || !linkedTicketId) {
+      throw new Error("The seeded technician and linked job-card ticket are required");
+    }
+
+    const linkedJobCard = await client.query<{ id: string }>(
+      `WITH updated AS (
+         UPDATE job_cards
+         SET assigned_to = $2,
+             created_by = $2,
+             title = 'Projector assessment in Lab G14',
+             description = tickets.description,
+             category_id = tickets.category_id,
+             priority = tickets.priority,
+             location_id = tickets.location_id,
+             location_details = tickets.location_details,
+             station_reference = tickets.station_reference,
+             walk_in_reporter_name = NULL,
+             walk_in_reporter_email = NULL,
+             updated_at = CURRENT_TIMESTAMP
+         FROM tickets
+         WHERE job_cards.primary_ticket_id = $1
+           AND job_cards.title = 'Projector assessment in Lab G14'
+           AND tickets.id = $1
+         RETURNING job_cards.id
+       ),
+       inserted AS (
+         INSERT INTO job_cards (
+           primary_ticket_id, assigned_to, created_by, title, description,
+           category_id, priority, location_id, location_details,
+           station_reference, target_at
+         )
+         SELECT
+           tickets.id, $2, $2, 'Projector assessment in Lab G14',
+           tickets.description, tickets.category_id, tickets.priority,
+           tickets.location_id, tickets.location_details,
+           tickets.station_reference, CURRENT_TIMESTAMP + INTERVAL '8 hours'
+         FROM tickets
+         WHERE tickets.id = $1
+           AND NOT EXISTS (SELECT 1 FROM updated)
+         RETURNING id
+       )
+       SELECT id FROM updated
+       UNION ALL
+       SELECT id FROM inserted
+       LIMIT 1`,
+      [linkedTicketId, technicianId],
+    );
+
+    const walkInJobCard = await client.query<{ id: string }>(
+      `WITH updated AS (
+         UPDATE job_cards
+         SET primary_ticket_id = NULL,
+             assigned_to = $1,
+             created_by = $1,
+             description = 'Configure the student laptop for secure campus Wi-Fi and verify access.',
+             category_id = categories.id,
+             priority = 'LOW',
+             location_id = locations.id,
+             location_details = 'CSIS help desk',
+             station_reference = 'Personal laptop',
+             walk_in_reporter_name = 'Thabo Molefe',
+             walk_in_reporter_email = 'thabo.molefe@mynwu.ac.za',
+             updated_at = CURRENT_TIMESTAMP
+         FROM categories, locations
+         WHERE job_cards.title = 'Walk-in laptop Wi-Fi configuration'
+           AND job_cards.primary_ticket_id IS NULL
+           AND categories.name = 'Network'
+           AND locations.name = 'Building G'
+         RETURNING job_cards.id
+       ),
+       inserted AS (
+         INSERT INTO job_cards (
+           primary_ticket_id, assigned_to, created_by, title, description,
+           category_id, priority, location_id, location_details,
+           station_reference, walk_in_reporter_name, walk_in_reporter_email,
+           target_at
+         )
+         SELECT
+           NULL, $1, $1, 'Walk-in laptop Wi-Fi configuration',
+           'Configure the student laptop for secure campus Wi-Fi and verify access.',
+           categories.id, 'LOW', locations.id, 'CSIS help desk',
+           'Personal laptop', 'Thabo Molefe', 'thabo.molefe@mynwu.ac.za',
+           CURRENT_TIMESTAMP + INTERVAL '2 hours'
+         FROM categories, locations
+         WHERE categories.name = 'Network'
+           AND locations.name = 'Building G'
+           AND NOT EXISTS (SELECT 1 FROM updated)
+         RETURNING id
+       )
+       SELECT id FROM updated
+       UNION ALL
+       SELECT id FROM inserted
+       LIMIT 1`,
+      [technicianId],
+    );
+
+    for (const [jobCardId, items] of [
+      [linkedJobCard.rows[0]?.id, ["Inspect projector input and cabling", "Test the lectern display output"]],
+      [walkInJobCard.rows[0]?.id, ["Configure secure Wi-Fi profile", "Confirm internet access with the requester"]],
+    ] as const) {
+      if (!jobCardId) throw new Error("Could not seed demo job card");
+      for (const [position, body] of items.entries()) {
+        await client.query(
+          `INSERT INTO job_card_checklist_items (job_card_id, body, position)
+           SELECT $1, $2, $3
+           WHERE NOT EXISTS (
+             SELECT 1 FROM job_card_checklist_items
+             WHERE job_card_id = $1 AND body = $2
+           )`,
+          [jobCardId, body, position],
+        );
+      }
+    }
+
     await client.query(
       `INSERT INTO audit_events (actor_id, action, new_values)
        SELECT $1, 'DEMO_DATA_SEEDED', $2::jsonb
@@ -399,7 +517,7 @@ async function main() {
     );
 
     await client.query("COMMIT");
-    console.log("Demo data ready: one account for each role and eight workflow tickets.");
+    console.log("Demo data ready: one account per role, eight workflow tickets, and linked plus walk-in job cards.");
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;

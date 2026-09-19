@@ -33,7 +33,6 @@ before(async () => {
 
 after(async () => {
   if (createdUserIds.length) {
-    await pool.query(`DELETE FROM audit_events WHERE actor_id = ANY($1::uuid[])`, [createdUserIds]);
     await pool.query(`DELETE FROM notification_outbox WHERE recipient_email = ANY($1::text[])`, [createdEmails]);
     await pool.query(`DELETE FROM users WHERE id = ANY($1::uuid[])`, [createdUserIds]);
   }

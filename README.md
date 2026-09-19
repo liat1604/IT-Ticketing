@@ -30,6 +30,12 @@ Get-Content -LiteralPath ".\server\db\migrations\002_auth_sessions.sql" -Raw | d
 Get-Content -LiteralPath ".\server\db\migrations\003_operational_features.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
 Get-Content -LiteralPath ".\server\db\migrations\004_ticket_sub_issues.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
 Get-Content -LiteralPath ".\server\db\migrations\005_job_cards.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
+Get-Content -LiteralPath ".\server\db\migrations\006_ticket_started_notification.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
+Get-Content -LiteralPath ".\server\db\migrations\007_job_card_walk_ins.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
+Get-Content -LiteralPath ".\server\db\migrations\007_password_resets.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
+Get-Content -LiteralPath ".\server\db\migrations\008_email_verification.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
+Get-Content -LiteralPath ".\server\db\migrations\009_immutable_audit_events.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
+Get-Content -LiteralPath ".\server\db\migrations\010_job_card_escalation.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
 npm --prefix server run seed-demo
 ```
 
@@ -93,6 +99,23 @@ days so the dashboard, queues, escalation flow and historical reporting all
 have representative data. The seed validates this status and age coverage
 before writing anything to the database.
 
+It also creates two job cards for Sebastian Klopper: one linked to the Lab G14
+projector ticket and one manually captured walk-in Wi-Fi job. In **Job cards →
+Create job card**, choosing a ticket copies its requester, title, description,
+technician, category, priority, location and station into the form. Leave
+**Linked ticket** set to **No ticket — manual walk-in job** to record a walk-in
+request directly; enter the requester's name and the job details manually.
+
+The Job cards view is a true six-column kanban board: **Pending** (scheduled),
+**In progress** (live), **Paused**, **Escalated**, **Resolved** (completed), and
+**Cancelled**. Walk-in cards can be escalated with a reason, ended with an end
+note, or marked resolved with a completion note; all three actions stop an
+active timer and add an immutable audit event.
+The badge palette is consistent across the board and detail view: NWU purple
+(`#4B2C70`) is used for brand actions, red (`#DC2626`) for pending and high
+priority work, amber (`#D97706`) for in-progress work, green (`#16A34A`) for
+resolved work, and slate (`#64748B`) for paused or cancelled work.
+
 ## First system administrator
 
 Set temporary environment values in the server terminal, run the bootstrap command, and immediately clear the password variable:
@@ -155,7 +178,7 @@ and does not create a session. Links expire in 24 hours and are single-use;
 users can request another from **Resend verification email** on the sign-in page.
 Password resets do not bypass email verification.
 
-Apply migrations 006, 007 and 008 after the earlier migrations, before starting
+Apply migrations 006 through 010 after the earlier migrations, before starting
 the updated server. Apply 008 once: it preserves access for existing accounts.
 New accounts default to unverified. Development seeds and the system-admin
 bootstrap explicitly provision trusted accounts with access.
@@ -164,6 +187,8 @@ bootstrap explicitly provision trusted accounts with access.
 Get-Content -LiteralPath ".\server\db\migrations\006_ticket_started_notification.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
 Get-Content -LiteralPath ".\server\db\migrations\007_password_resets.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
 Get-Content -LiteralPath ".\server\db\migrations\008_email_verification.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
+Get-Content -LiteralPath ".\server\db\migrations\009_immutable_audit_events.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
+Get-Content -LiteralPath ".\server\db\migrations\010_job_card_escalation.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
 ```
 
 Set `APP_BASE_URL` to the externally accessible frontend URL and configure
@@ -171,3 +196,7 @@ Set `APP_BASE_URL` to the externally accessible frontend URL and configure
 The API's existing notification worker delivers verification emails through SMTP.
 Without SMTP configuration, emails remain queued and new users cannot verify.
 Run `npm --prefix server test` for the authentication integration tests.
+
+Audit events are append-only. PostgreSQL rejects direct `UPDATE`, `DELETE` and
+`TRUNCATE` operations on `audit_events`, and historical actor/ticket UUIDs
+remain in the audit row even after the referenced record is removed.
