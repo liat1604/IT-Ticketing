@@ -92,7 +92,6 @@ function ReportsOverview({ showReportHeading, role }: { showReportHeading: boole
   }
 
   if (loading && !data) return <LoadingPanel label="Loading operational reporting" />;
-  const maximum = Math.max(1, ...(data?.byCategory.map((item) => item.value) ?? []));
   return <div className="space-y-6">
     <div><h1 className="text-2xl font-semibold tracking-tight">{showReportHeading ? "Reports and analytics" : "Operational overview"}</h1><p className="text-sm text-muted-foreground">Live service data from PostgreSQL—not demonstration values.</p></div>
     <Card>
@@ -110,7 +109,7 @@ function ReportsOverview({ showReportHeading, role }: { showReportHeading: boole
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric label="Current active tickets" value={data.metrics.activeTickets} icon={<TicketCheck />} /><Metric label="Created in period" value={data.metrics.createdInPeriod} icon={<Plus />} /><Metric label="Resolved in period" value={data.metrics.resolvedInPeriod} icon={<ShieldCheck />} /><Metric label="Average resolution" value={formatDuration(data.metrics.averageResolutionSeconds)} icon={<Activity />} /></section>
       {showReportHeading && <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric label="Median resolution" value={formatDuration(data.metrics.medianResolutionSeconds)} icon={<Timer />} /><Metric label="Resolution rate" value={`${data.metrics.resolutionRate}%`} icon={<BarChart3 />} /><Metric label="Unassigned tickets" value={data.metrics.unassignedTickets} icon={<AlertTriangle />} /><Metric label="Overdue targets" value={data.metrics.overdueTargets} icon={<CalendarRange />} /></section>}
       <div className="grid gap-6 xl:grid-cols-2">
-        <Card><CardHeader><CardTitle>Tickets by category</CardTitle><CardDescription>Requests created during the selected period</CardDescription></CardHeader><CardContent className="space-y-4">{data.byCategory.map((item) => <div key={item.name}><div className="mb-1 flex justify-between text-sm"><span>{item.name}</span><span className="font-semibold">{item.value}</span></div><div className="h-2.5 rounded-full bg-slate-100"><div className="h-2.5 rounded-full bg-[#4B2C70]" style={{ width: `${(item.value / maximum) * 100}%` }} /></div></div>)}</CardContent></Card>
+        <Card><CardHeader><CardTitle>Tickets by category</CardTitle><CardDescription>Requests created during the selected period</CardDescription></CardHeader><CardContent><CategoryPieChart data={data.byCategory} /></CardContent></Card>
         <Card><CardHeader><CardTitle>Status distribution</CardTitle><CardDescription>Current status of tickets created in the selected period</CardDescription></CardHeader><CardContent className="grid gap-3 sm:grid-cols-2">{data.byStatus.map((item) => <div key={item.name} className="rounded-xl border p-4"><p className="text-sm text-muted-foreground">{formatValue(item.name)}</p><p className="mt-1 text-2xl font-semibold">{item.value}</p></div>)}</CardContent></Card>
       </div>
       <Card><CardHeader><CardTitle>Technician performance</CardTitle><CardDescription>Work handled during the selected period; active is the technician's current queue.</CardDescription></CardHeader><CardContent><ResponsiveTable headings={["Technician","Active","Handled","Resolved","Walk-ins","Recorded time","Avg. resolution"]}>{data.technicianPerformance.map((person) => <tr key={person.id} className="border-t"><td className="px-4 py-3 font-medium">{person.fullName}</td><td className="px-4 py-3">{person.activeTickets}</td><td className="px-4 py-3">{person.handledTickets}</td><td className="px-4 py-3">{person.resolvedTickets}</td><td className="px-4 py-3">{person.manualTickets}</td><td className="whitespace-nowrap px-4 py-3">{formatDuration(person.workSeconds)}</td><td className="whitespace-nowrap px-4 py-3">{person.resolvedTickets ? formatDuration(person.averageResolutionSeconds) : "—"}</td></tr>)}</ResponsiveTable></CardContent></Card>
@@ -121,13 +120,12 @@ function ReportsOverview({ showReportHeading, role }: { showReportHeading: boole
 }
 
 function ExtendedReports({ data }: { data: Overview }) {
-  const timelineMaximum = Math.max(1, ...data.resolutionTimeline.flatMap((item) => [item.created, item.resolved]));
   const backlogMaximum = Math.max(1, ...data.backlogAge.map((item) => item.value));
   const sourceMaximum = Math.max(1, ...data.sourceBreakdown.map((item) => item.value));
   const completedSubIssues = data.subIssueSummary.totalSubIssues === 0 ? 0 : Math.round((data.subIssueSummary.resolvedSubIssues / data.subIssueSummary.totalSubIssues) * 100);
 
   return <div className="space-y-6">
-    <Card><CardHeader><CardTitle>Ticket flow over time</CardTitle><CardDescription>Created versus resolved tickets in each reporting bucket.</CardDescription></CardHeader><CardContent>{data.resolutionTimeline.length === 0 ? <EmptyReport /> : <div className="space-y-4">{data.resolutionTimeline.map((item) => <div key={item.label} className="grid gap-2 sm:grid-cols-[120px_1fr]"><p className="text-sm font-medium">{formatTimelineLabel(item.label, data.periodDays)}</p><div className="space-y-1.5"><ReportBar label="Created" value={item.created} maximum={timelineMaximum} className="bg-[#4B2C70]" /><ReportBar label="Resolved" value={item.resolved} maximum={timelineMaximum} className="bg-emerald-500" /></div></div>)}</div>}</CardContent></Card>
+    <Card><CardHeader><CardTitle>Ticket flow over time</CardTitle><CardDescription>Created versus resolved tickets in each reporting bucket.</CardDescription></CardHeader><CardContent>{data.resolutionTimeline.length === 0 ? <EmptyReport /> : <TimelineLineChart data={data.resolutionTimeline} periodDays={data.periodDays} />}</CardContent></Card>
     <Card><CardHeader><CardTitle>Resolution time and service targets</CardTitle><CardDescription>Elapsed time from ticket creation to resolution, compared with operational priority targets.</CardDescription></CardHeader><CardContent>{data.resolutionByPriority.length === 0 ? <EmptyReport /> : <ResponsiveTable headings={["Priority","Target","Resolved","Average","Median","Within target"]}>{data.resolutionByPriority.map((item) => { const percentage = item.resolvedTickets === 0 ? 0 : Math.round((item.withinTarget / item.resolvedTickets) * 100); return <tr key={item.name} className="border-t"><td className="px-4 py-3"><Priority priority={item.name} /></td><td className="px-4 py-3">{formatDuration(item.targetSeconds)}</td><td className="px-4 py-3">{item.resolvedTickets}</td><td className="px-4 py-3">{formatDuration(item.averageResolutionSeconds)}</td><td className="px-4 py-3">{formatDuration(item.medianResolutionSeconds)}</td><td className="px-4 py-3"><span className={percentage >= 80 ? "text-emerald-700" : percentage >= 50 ? "text-amber-700" : "text-red-700"}>{item.withinTarget} ({percentage}%)</span></td></tr>; })}</ResponsiveTable>}</CardContent></Card>
     <div className="grid gap-6 xl:grid-cols-2">
       <Card><CardHeader><CardTitle>Current backlog age</CardTitle><CardDescription>Open tickets grouped by how long they have been waiting.</CardDescription></CardHeader><CardContent className="space-y-4">{data.backlogAge.length === 0 ? <EmptyReport /> : data.backlogAge.map((item) => <ReportBar key={item.name} label={item.name} value={item.value} maximum={backlogMaximum} className={item.name === "15+ days" ? "bg-red-500" : "bg-amber-500"} />)}</CardContent></Card>
@@ -135,6 +133,101 @@ function ExtendedReports({ data }: { data: Overview }) {
     </div>
     <Card><CardHeader><CardTitle className="flex items-center gap-2"><GitBranch className="text-[#4B2C70]" /> Sub-issue delivery</CardTitle><CardDescription>Progress on larger tickets that were divided into technician work items.</CardDescription></CardHeader><CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><SmallStat label="Parent tickets" value={data.subIssueSummary.parentsWithSubIssues} /><SmallStat label="Total sub-issues" value={data.subIssueSummary.totalSubIssues} /><SmallStat label={`Resolved (${completedSubIssues}%)`} value={data.subIssueSummary.resolvedSubIssues} /><SmallStat label="Overdue work items" value={data.subIssueSummary.overdueWorkItems} /></CardContent></Card>
     <Card><CardHeader><CardTitle>Operational attention</CardTitle><CardDescription>Current queue risks that may need administrator action.</CardDescription></CardHeader><CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><SmallStat label="Escalated" value={data.metrics.escalatedTickets} /><SmallStat label="Critical open" value={data.metrics.criticalTickets} /><SmallStat label="Unassigned" value={data.metrics.unassignedTickets} /><SmallStat label="Overdue targets" value={data.metrics.overdueTargets} /></CardContent></Card>
+  </div>;
+}
+
+const categoryChartColors: Record<string, string> = {
+  Hardware: "#4B2C70",
+  Access: "#7C3AED",
+  Network: "#0EA5E9",
+  "Physical Hazard": "#DC2626",
+  Software: "#10B981",
+  Other: "#64748B",
+};
+
+const fallbackCategoryChartColors = ["#4B2C70", "#7C3AED", "#0EA5E9", "#DC2626", "#10B981", "#64748B"];
+
+function CategoryPieChart({ data }: { data: Array<{ name: string; value: number }> }) {
+  const total = data.reduce((sum, item) => sum + Math.max(0, item.value), 0);
+  const size = 220;
+  const center = size / 2;
+  const radius = 94;
+  let currentAngle = -Math.PI / 2;
+  const slices = data.filter((item) => item.value > 0).map((item, index) => {
+    const fraction = item.value / total;
+    const startAngle = currentAngle;
+    const endAngle = currentAngle + fraction * Math.PI * 2;
+    currentAngle = endAngle;
+    const startX = center + radius * Math.cos(startAngle);
+    const startY = center + radius * Math.sin(startAngle);
+    const endX = center + radius * Math.cos(endAngle);
+    const endY = center + radius * Math.sin(endAngle);
+    const path = fraction >= 0.9999
+      ? null
+      : `M ${center} ${center} L ${startX} ${startY} A ${radius} ${radius} 0 ${fraction > 0.5 ? 1 : 0} 1 ${endX} ${endY} Z`;
+    return { item, index, color: categoryChartColors[item.name] ?? fallbackCategoryChartColors[index % fallbackCategoryChartColors.length], path };
+  });
+
+  return <div className="grid items-center gap-6 md:grid-cols-[minmax(220px,0.9fr)_1fr]">
+    <div className="flex justify-center">
+      <svg viewBox={`0 0 ${size} ${size}`} className="h-56 w-56 max-w-full" role="img" aria-labelledby="category-pie-title category-pie-description">
+        <title id="category-pie-title">Tickets by category</title>
+        <desc id="category-pie-description">A pie chart showing the number of tickets created in each category during the selected period.</desc>
+        {total === 0 ? <circle cx={center} cy={center} r={radius} fill="#E2E8F0" /> : slices.map(({ item, color, path }) => path ? <path key={item.name} d={path} fill={color} stroke="white" strokeWidth="2"><title>{`${item.name}: ${item.value} tickets`}</title></path> : <circle key={item.name} cx={center} cy={center} r={radius} fill={color} stroke="white" strokeWidth="2"><title>{`${item.name}: ${item.value} tickets`}</title></circle>)}
+      </svg>
+    </div>
+    <div className="space-y-2" role="list" aria-label="Ticket categories">
+      {data.map((item, index) => {
+        const percentage = total === 0 ? 0 : Math.round((Math.max(0, item.value) / total) * 100);
+        const color = categoryChartColors[item.name] ?? fallbackCategoryChartColors[index % fallbackCategoryChartColors.length];
+        return <div key={item.name} className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm" role="listitem">
+          <span className="flex min-w-0 items-center gap-2"><span className="size-3 shrink-0 rounded-full border border-black/10" style={{ backgroundColor: color, opacity: item.value === 0 ? 0.35 : 1 }} /><span className="truncate">{item.name}</span></span>
+          <span className="shrink-0 font-semibold tabular-nums">{item.value} <span className="font-normal text-muted-foreground">({percentage}%)</span></span>
+        </div>;
+      })}
+      {total === 0 && <p className="text-sm text-muted-foreground">No tickets were created in this period.</p>}
+    </div>
+  </div>;
+}
+
+function TimelineLineChart({ data, periodDays }: { data: Array<{ label: string; created: number; resolved: number }>; periodDays: number }) {
+  const width = 760;
+  const height = 300;
+  const padding = { top: 22, right: 18, bottom: 48, left: 42 };
+  const plotWidth = width - padding.left - padding.right;
+  const plotHeight = height - padding.top - padding.bottom;
+  const maximum = Math.max(1, ...data.flatMap((item) => [item.created, item.resolved]));
+  const tickCount = Math.min(4, maximum);
+  const pointX = (index: number) => data.length === 1 ? padding.left + plotWidth / 2 : padding.left + (index * plotWidth) / (data.length - 1);
+  const pointY = (value: number) => padding.top + plotHeight - (Math.max(0, value) / maximum) * plotHeight;
+  const createdPoints = data.map((item, index) => `${pointX(index)},${pointY(item.created)}`).join(" ");
+  const resolvedPoints = data.map((item, index) => `${pointX(index)},${pointY(item.resolved)}`).join(" ");
+  const labelStride = Math.max(1, Math.ceil(data.length / 8));
+  const formatPointLabel = (item: { label: string; created: number; resolved: number }) => `${formatTimelineLabel(item.label, periodDays)}: ${item.created} created, ${item.resolved} resolved`;
+
+  return <div className="space-y-4">
+    <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm" aria-label="Chart legend">
+      <span className="flex items-center gap-2"><span className="h-0.5 w-6 bg-[#4B2C70]" />Created</span>
+      <span className="flex items-center gap-2"><span className="h-0.5 w-6 bg-emerald-500" />Resolved</span>
+    </div>
+    <div className="overflow-x-auto">
+      <svg viewBox={`0 0 ${width} ${height}`} className="min-w-[620px] w-full" role="img" aria-labelledby="ticket-flow-title ticket-flow-description">
+        <title id="ticket-flow-title">Ticket flow over time</title>
+        <desc id="ticket-flow-description">A line chart comparing created and resolved tickets in each reporting bucket.</desc>
+        {Array.from({ length: tickCount + 1 }, (_, index) => {
+          const value = Math.round((maximum * index) / tickCount);
+          const y = pointY(value);
+          return <g key={`tick-${value}`}><line x1={padding.left} x2={width - padding.right} y1={y} y2={y} stroke="#E2E8F0" strokeWidth="1" /><text x={padding.left - 10} y={y + 4} textAnchor="end" className="fill-slate-500 text-[11px]">{value}</text></g>;
+        })}
+        <polyline points={createdPoints} fill="none" stroke="#4B2C70" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        <polyline points={resolvedPoints} fill="none" stroke="#10B981" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        {data.map((item, index) => <g key={item.label}>
+          <circle cx={pointX(index)} cy={pointY(item.created)} r="4.5" fill="#4B2C70" stroke="white" strokeWidth="2"><title>{`${formatPointLabel(item)} — created`}</title></circle>
+          <circle cx={pointX(index)} cy={pointY(item.resolved)} r="4.5" fill="#10B981" stroke="white" strokeWidth="2"><title>{`${formatPointLabel(item)} — resolved`}</title></circle>
+          {(index % labelStride === 0 || index === data.length - 1) && <text x={pointX(index)} y={height - 16} textAnchor="middle" className="fill-slate-500 text-[11px]">{formatTimelineLabel(item.label, periodDays)}</text>}
+        </g>)}
+      </svg>
+    </div>
   </div>;
 }
 
