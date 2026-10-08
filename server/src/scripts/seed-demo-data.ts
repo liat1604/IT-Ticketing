@@ -29,6 +29,16 @@ type SeedTicket = {
   externalReference?: string;
 };
 
+type DemoCalendarEvent = {
+  ticketKey: string;
+  title: string;
+  eventType: "SLA" | "SITE_VISIT" | "MAINTENANCE" | "FOLLOW_UP";
+  startsInHours: number;
+  durationMinutes: number;
+  location: string;
+  notes: string;
+};
+
 const users: SeedUser[] = [
   {
     fullName: "Selouna Visser",
@@ -168,6 +178,45 @@ const requiredTicketStatuses: TicketStatus[] = [
   "IN_PROGRESS",
   "ESCALATED",
   "RESOLVED",
+];
+
+const demoCalendarEvents: DemoCalendarEvent[] = [
+  {
+    ticketKey: "DEMO-PROJECTOR-G14",
+    title: "Projector inspection",
+    eventType: "SITE_VISIT",
+    startsInHours: 2,
+    durationMinutes: 60,
+    location: "Lab G14",
+    notes: "Check the lectern output, cable connections and projector input.",
+  },
+  {
+    ticketKey: "DEMO-PORTAL-ACCESS",
+    title: "Student portal access follow-up",
+    eventType: "FOLLOW_UP",
+    startsInHours: 26,
+    durationMinutes: 30,
+    location: "Online",
+    notes: "Confirm the student can sign in after the access policy review.",
+  },
+  {
+    ticketKey: "DEMO-WIFI-G30",
+    title: "Wi-Fi stability review",
+    eventType: "SLA",
+    startsInHours: 50,
+    durationMinutes: 45,
+    location: "Lab G30",
+    notes: "Review connection logs and verify stability across the affected rows.",
+  },
+  {
+    ticketKey: "DEMO-CORE-SWITCH",
+    title: "Building G network escalation update",
+    eventType: "FOLLOW_UP",
+    startsInHours: 74,
+    durationMinutes: 30,
+    location: "Building G",
+    notes: "Check the Central IT escalation and update the linked ticket.",
+  },
 ];
 
 function assertDemoTicketCoverage() {
@@ -397,6 +446,56 @@ async function main() {
       throw new Error("The seeded technician and linked job-card ticket are required");
     }
 
+    for (const event of demoCalendarEvents) {
+      const ticketId = ticketIds.get(event.ticketKey);
+      if (!ticketId) {
+        throw new Error(`Could not find linked ticket for calendar event: ${event.title}`);
+      }
+
+      const startsAt = new Date(Date.now() + event.startsInHours * 60 * 60 * 1000);
+      const endsAt = new Date(startsAt.getTime() + event.durationMinutes * 60 * 1000);
+
+      await client.query(
+        `WITH updated AS (
+           UPDATE schedule_events
+           SET event_type = $2,
+               starts_at = $3,
+               ends_at = $4,
+               location = $5,
+               notes = $6,
+               assigned_to = $8,
+               created_by = $8,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE title = $1
+             AND ticket_id = $7
+           RETURNING id
+         ),
+         inserted AS (
+           INSERT INTO schedule_events (
+             title, event_type, starts_at, ends_at, location, notes,
+             ticket_id, assigned_to, created_by
+           )
+           SELECT $1, $2, $3, $4, $5, $6, $7, $8, $8
+           WHERE NOT EXISTS (SELECT 1 FROM updated)
+           RETURNING id
+         )
+         SELECT id FROM updated
+         UNION ALL
+         SELECT id FROM inserted
+         LIMIT 1`,
+        [
+          event.title,
+          event.eventType,
+          startsAt,
+          endsAt,
+          event.location,
+          event.notes,
+          ticketId,
+          technicianId,
+        ],
+      );
+    }
+
     const linkedJobCard = await client.query<{ id: string }>(
       `WITH updated AS (
          UPDATE job_cards
@@ -517,7 +616,7 @@ async function main() {
     );
 
     await client.query("COMMIT");
-    console.log("Demo data ready: one account per role, eight workflow tickets, and linked plus walk-in job cards.");
+    console.log("Demo data ready: one account per role, eight workflow tickets, four linked calendar events, and linked plus walk-in job cards.");
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;

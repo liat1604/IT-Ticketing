@@ -106,6 +106,12 @@ technician, category, priority, location and station into the form. Leave
 **Linked ticket** set to **No ticket — manual walk-in job** to record a walk-in
 request directly; enter the requester's name and the job details manually.
 
+The same seed creates four upcoming service calendar events linked to the
+projector, portal access, Lab G30 Wi-Fi and Building G network tickets. Open
+**Calendar** as a technician or administrator to see them in the current month
+and upcoming agenda. Select an event in the calendar or agenda to view its
+details; the creator and administrators can edit and save it.
+
 The Job cards view is a true six-column kanban board: **Pending** (scheduled),
 **In progress** (live), **Paused**, **Escalated**, **Resolved** (completed), and
 **Cancelled**. Walk-in cards can be escalated with a reason, ended with an end

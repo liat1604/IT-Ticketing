@@ -40,6 +40,18 @@ function currentUser(request: unknown) {
   return (request as AuthenticatedRequest).user;
 }
 
+type ScheduleEventRecord = {
+  id: string;
+  title: string;
+  event_type: string;
+  starts_at: Date;
+  ends_at: Date | null;
+  location: string | null;
+  notes: string | null;
+  ticket_id: string | null;
+  assigned_to: string | null;
+};
+
 calendarRouter.get("/", async (request, response) => {
   const from = String(request.query.from ?? "");
   const to = String(request.query.to ?? "");
@@ -89,6 +101,10 @@ calendarRouter.get("/", async (request, response) => {
         `SELECT id, ticket_number AS "ticketNumber", title
          FROM tickets
          WHERE status <> 'RESOLVED'
+            OR EXISTS (
+              SELECT 1 FROM schedule_events
+              WHERE schedule_events.ticket_id = tickets.id
+            )
          ORDER BY created_at DESC
          LIMIT 100`,
       ),
@@ -204,6 +220,124 @@ calendarRouter.post("/", async (request, response) => {
     await client.query("ROLLBACK");
     console.error("Schedule event creation failed", error);
     response.status(500).json({ error: "Schedule event creation failed" });
+  } finally {
+    client.release();
+  }
+});
+
+calendarRouter.patch("/:eventId", async (request, response) => {
+  const actor = currentUser(request);
+  const parsedId = z.string().uuid().safeParse(request.params.eventId);
+  if (!parsedId.success) {
+    response.status(400).json({ error: "Invalid schedule event" });
+    return;
+  }
+
+  const parsed = eventSchema.safeParse(request.body);
+  if (!parsed.success) {
+    response.status(400).json({
+      error: parsed.error.issues[0]?.message ?? "Invalid schedule event",
+    });
+    return;
+  }
+
+  const input = parsed.data;
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const previousResult = await client.query<ScheduleEventRecord>(
+      `SELECT id, title, event_type, starts_at, ends_at, location, notes,
+              ticket_id, assigned_to
+       FROM schedule_events
+       WHERE id = $1
+         AND (
+           created_by = $2
+           OR $3::user_role IN ('ADMIN', 'SYSTEM_ADMIN')
+         )
+       FOR UPDATE`,
+      [parsedId.data, actor.id, actor.role],
+    );
+    const previous = previousResult.rows[0];
+    if (!previous) {
+      await client.query("ROLLBACK");
+      response.status(404).json({ error: "Schedule event not found or not permitted" });
+      return;
+    }
+
+    const updatedResult = await client.query<ScheduleEventRecord>(
+      `UPDATE schedule_events
+       SET title = $2,
+           event_type = $3,
+           starts_at = $4,
+           ends_at = $5,
+           location = $6,
+           notes = $7,
+           ticket_id = $8,
+           assigned_to = $9,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1
+       RETURNING id, title, event_type, starts_at, ends_at, location, notes,
+                 ticket_id, assigned_to`,
+      [
+        parsedId.data,
+        input.title,
+        input.eventType,
+        input.startsAt,
+        input.endsAt ?? null,
+        input.location || null,
+        input.notes || null,
+        input.ticketId ?? null,
+        input.assignedTo ?? null,
+      ],
+    );
+    const event = updatedResult.rows[0];
+    if (!event) throw new Error("Schedule event disappeared during update");
+
+    const auditValues = (value: ScheduleEventRecord) => ({
+      scheduleEventId: value.id,
+      title: value.title,
+      eventType: value.event_type,
+      startsAt: value.starts_at,
+      endsAt: value.ends_at,
+      location: value.location,
+      notes: value.notes,
+      ticketId: value.ticket_id,
+      assignedTo: value.assigned_to,
+    });
+
+    await client.query(
+      `INSERT INTO audit_events (
+         ticket_id, actor_id, action, previous_values, new_values
+       )
+       VALUES ($1, $2, 'SCHEDULE_EVENT_UPDATED', $3::jsonb, $4::jsonb)`,
+      [
+        event.ticket_id ?? previous.ticket_id,
+        actor.id,
+        JSON.stringify(auditValues(previous)),
+        JSON.stringify(auditValues(event)),
+      ],
+    );
+
+    await client.query("COMMIT");
+    response.json({
+      event: {
+        id: event.id,
+        title: event.title,
+        eventType: event.event_type,
+        startsAt: event.starts_at,
+        endsAt: event.ends_at,
+        location: event.location,
+        notes: event.notes,
+        ticketId: event.ticket_id,
+        assignedTo: event.assigned_to,
+      },
+    });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Schedule event update failed", error);
+    response.status(500).json({ error: "Schedule event update failed" });
   } finally {
     client.release();
   }

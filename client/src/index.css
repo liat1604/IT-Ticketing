@@ -1,6 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "shadcn/tailwind.css";
+@import "./vendor/shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
 
 @custom-variant dark (&:is(.dark *));
@@ -155,7 +155,7 @@
   animation: auth-content-enter 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 
-[class~="bg-[#4B2C70]"]:not(button) {
+[class~="bg-[#4B2C70]"]:not(button):not(.portal-sidebar-motion) {
   background-image:
     repeating-linear-gradient(
       34deg,
@@ -172,8 +172,52 @@
   animation: purple-line-drift 30s ease-in-out infinite alternate;
 }
 
+.portal-sidebar-motion {
+  background-image:
+    radial-gradient(ellipse at center, rgb(213 149 241 / 18%), transparent 64%),
+    radial-gradient(ellipse at center, rgb(134 22 228 / 21%), transparent 66%),
+    linear-gradient(150deg, #4b2c70 0%, #41225f 54%, #4f2b73 100%);
+  background-size: 190% 190%, 190% 190%, auto;
+  animation: portal-sidebar-atmosphere 22s ease-in-out infinite alternate;
+  isolation: isolate;
+}
+
+.portal-sidebar-motion::before {
+  position: absolute;
+  inset: -35%;
+  z-index: -1;
+  background-image:
+    repeating-linear-gradient(
+      34deg,
+      transparent 0 138px,
+      rgb(255 255 255 / 9%) 139px 140px,
+      transparent 141px 276px
+    ),
+    repeating-linear-gradient(
+      143deg,
+      transparent 0 174px,
+      rgb(255 255 255 / 7%) 175px 176px,
+      transparent 177px 348px
+    );
+  content: "";
+  pointer-events: none;
+  animation: portal-sidebar-lines-glide 26s ease-in-out infinite alternate;
+}
+
+@keyframes portal-sidebar-lines-glide {
+  from { transform: translate3d(-32px, -24px, 0); }
+  to { transform: translate3d(32px, 24px, 0); }
+}
+
+@keyframes portal-sidebar-atmosphere {
+  from { background-position: 0% 0%, 100% 100%, 0 0; }
+  to { background-position: 100% 82%, 0% 14%, 0 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  [class~="bg-[#4B2C70]"]:not(button),
+  [class~="bg-[#4B2C70]"]:not(button):not(.portal-sidebar-motion),
+  .portal-sidebar-motion,
+  .portal-sidebar-motion::before,
   .auth-content-enter {
     animation: none;
   }

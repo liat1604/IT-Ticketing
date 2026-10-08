@@ -29,6 +29,7 @@ export function CalendarDashboard({ userId, role }: { userId: string; role: User
   const [error, setError] = useState("");
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<ScheduleEvent | null>(null);
 
   const range = useMemo(() => {
     const from = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
@@ -56,22 +57,27 @@ export function CalendarDashboard({ userId, role }: { userId: string; role: User
   }, [cursor, range]);
 
   const upcoming = [...events].filter((event) => new Date(event.startsAt).getTime() >= now).slice(0, 8);
+  const canEditSelectedEvent = !selectedEvent
+    || selectedEvent.createdBy === userId
+    || role === "ADMIN"
+    || role === "SYSTEM_ADMIN";
 
-  async function createEvent(event: FormEvent<HTMLFormElement>) {
+  async function saveEvent(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setSaving(true); setError("");
     const form = event.currentTarget;
     const data = new FormData(form);
+    const isEditing = selectedEvent !== null;
     try {
-      await api("/api/calendar", { method: "POST", body: JSON.stringify({
+      await api(isEditing ? `/api/calendar/${selectedEvent.id}` : "/api/calendar", { method: isEditing ? "PATCH" : "POST", body: JSON.stringify({
         title: data.get("title"), eventType: data.get("eventType"),
         startsAt: new Date(String(data.get("startsAt"))).toISOString(),
         endsAt: data.get("endsAt") ? new Date(String(data.get("endsAt"))).toISOString() : null,
         location: data.get("location"), notes: data.get("notes"),
         ticketId: data.get("ticketId") || null, assignedTo: data.get("assignedTo") || null,
       }) });
-      setOpen(false); form.reset(); await load();
+      setOpen(false); setSelectedEvent(null); form.reset(); await load();
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "Could not create event");
+      setError(caughtError instanceof Error ? caughtError.message : "Could not save event");
     } finally { setSaving(false); }
   }
 
@@ -84,7 +90,7 @@ export function CalendarDashboard({ userId, role }: { userId: string; role: User
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div><h1 className="text-2xl font-semibold tracking-tight">Service calendar</h1><p className="text-sm text-muted-foreground">Plan SLA targets, site visits, maintenance and follow-ups.</p></div>
-        <Button className="bg-[#4B2C70] text-white hover:bg-[#3d235d]" onClick={() => setOpen(true)}><Plus /> Add event</Button>
+        <Button className="bg-[#4B2C70] text-white hover:bg-[#3d235d]" onClick={() => { setSelectedEvent(null); setOpen(true); }}><Plus /> Add event</Button>
       </div>
       {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{error}</p>}
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
@@ -100,7 +106,7 @@ export function CalendarDashboard({ userId, role }: { userId: string; role: User
                 const dayEvents = day ? events.filter((event) => new Date(event.startsAt).getDate() === day) : [];
                 const isToday = day === new Date().getDate() && cursor.getMonth() === new Date().getMonth() && cursor.getFullYear() === new Date().getFullYear();
                 return <div key={`${day ?? 'empty'}-${index}`} className="min-h-28 border-b border-r p-2 last:border-r-0">
-                  {day && <><span className={isToday ? "inline-flex size-7 items-center justify-center rounded-full bg-[#4B2C70] text-xs font-semibold text-white" : "text-xs font-semibold"}>{day}</span><div className="mt-1 space-y-1">{dayEvents.slice(0, 3).map((item) => <button key={item.id} title={item.title} className={`block w-full truncate rounded px-2 py-1 text-left text-[11px] ${eventStyle(item.eventType)}`}>{new Date(item.startsAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} {item.title}</button>)}{dayEvents.length > 3 && <p className="text-[11px] text-muted-foreground">+{dayEvents.length - 3} more</p>}</div></>}
+                  {day && <><span className={isToday ? "inline-flex size-7 items-center justify-center rounded-full bg-[#4B2C70] text-xs font-semibold text-white" : "text-xs font-semibold"}>{day}</span><div className="mt-1 space-y-1">{dayEvents.slice(0, 3).map((item) => <button key={item.id} type="button" title={item.title} aria-label={`View ${item.title}`} onClick={() => { setSelectedEvent(item); setOpen(true); }} className={`block w-full truncate rounded px-2 py-1 text-left text-[11px] ${eventStyle(item.eventType)}`}>{new Date(item.startsAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} {item.title}</button>)}{dayEvents.length > 3 && <p className="text-[11px] text-muted-foreground">+{dayEvents.length - 3} more</p>}</div></>}
                 </div>;
               })}
             </div>}
@@ -109,27 +115,28 @@ export function CalendarDashboard({ userId, role }: { userId: string; role: User
         <Card>
           <CardHeader><CardTitle className="flex items-center gap-2"><CalendarDays className="size-5 text-[#4B2C70]" /> Upcoming agenda</CardTitle><CardDescription>Next scheduled service activities</CardDescription></CardHeader>
           <CardContent className="space-y-3">{upcoming.length === 0 ? <p className="py-12 text-center text-sm text-muted-foreground">No upcoming events this month.</p> : upcoming.map((event) => <article key={event.id} className="rounded-xl border p-3">
-            <div className="flex items-start justify-between gap-2"><div><Badge className={eventStyle(event.eventType)}>{formatValue(event.eventType)}</Badge><h2 className="mt-2 font-semibold">{event.title}</h2></div>{(event.createdBy === userId || role === "ADMIN" || role === "SYSTEM_ADMIN") && <Button size="icon" variant="ghost" aria-label={`Delete ${event.title}`} onClick={() => void removeEvent(event.id)}><Trash2 className="size-4 text-red-600" /></Button>}</div>
+            <div className="flex items-start justify-between gap-2"><div><Badge className={eventStyle(event.eventType)}>{formatValue(event.eventType)}</Badge><button type="button" className="mt-2 block text-left font-semibold hover:underline" onClick={() => { setSelectedEvent(event); setOpen(true); }}>{event.title}</button></div>{(event.createdBy === userId || role === "ADMIN" || role === "SYSTEM_ADMIN") && <Button size="icon" variant="ghost" aria-label={`Delete ${event.title}`} onClick={() => void removeEvent(event.id)}><Trash2 className="size-4 text-red-600" /></Button>}</div>
             <p className="mt-2 flex items-center gap-2 text-xs text-muted-foreground"><Clock3 className="size-3.5" />{new Date(event.startsAt).toLocaleString()}</p>
             {event.location && <p className="mt-1 flex items-center gap-2 text-xs text-muted-foreground"><MapPin className="size-3.5" />{event.location}</p>}
             {(event.ticketNumber || event.assignedName) && <p className="mt-2 text-xs text-muted-foreground">{[event.ticketNumber, event.assignedName].filter(Boolean).join(" · ")}</p>}
           </article>)}</CardContent>
         </Card>
       </div>
-      <Dialog open={open} onOpenChange={(next) => !saving && setOpen(next)}><DialogContent className="sm:max-w-xl"><form onSubmit={createEvent}><DialogHeader><DialogTitle>Schedule service activity</DialogTitle><DialogDescription>Add an operational event and optionally link it to a ticket.</DialogDescription></DialogHeader>
+      <Dialog open={open} onOpenChange={(next) => { if (!saving) { setOpen(next); if (!next) setSelectedEvent(null); } }}><DialogContent className="sm:max-w-xl"><form key={selectedEvent?.id ?? "new-event"} onSubmit={saveEvent}><DialogHeader><DialogTitle>{selectedEvent ? "Service activity details" : "Schedule service activity"}</DialogTitle><DialogDescription>{selectedEvent ? (canEditSelectedEvent ? "View or update this scheduled activity." : "You can view this activity, but only its creator or an administrator can change it.") : "Add an operational event and optionally link it to a ticket."}</DialogDescription></DialogHeader>
         <div className="grid gap-4 py-5 sm:grid-cols-2">
-          <Field label="Title" span><Input name="title" minLength={3} maxLength={160} required /></Field>
-          <Field label="Event type"><select name="eventType" className={selectClasses} defaultValue="FOLLOW_UP"><option value="SLA">SLA target</option><option value="SITE_VISIT">Site visit</option><option value="MAINTENANCE">Maintenance</option><option value="FOLLOW_UP">Follow-up</option></select></Field>
-          <Field label="Assigned to"><select name="assignedTo" className={selectClasses} defaultValue={userId}><option value="">Unassigned</option>{staff.map((person) => <option key={person.id} value={person.id}>{person.fullName}</option>)}</select></Field>
-          <Field label="Starts"><Input type="datetime-local" name="startsAt" required /></Field><Field label="Ends"><Input type="datetime-local" name="endsAt" /></Field>
-          <Field label="Linked ticket" span><select name="ticketId" className={selectClasses}><option value="">No linked ticket</option>{tickets.map((ticket) => <option key={ticket.id} value={ticket.id}>{ticket.ticketNumber} — {ticket.title}</option>)}</select></Field>
-          <Field label="Location" span><Input name="location" maxLength={200} placeholder="Building, room or online" /></Field><Field label="Notes" span><Textarea name="notes" maxLength={2000} /></Field>
-        </div><DialogFooter><Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button type="submit" className="bg-[#4B2C70] text-white" disabled={saving}>{saving ? <LoaderCircle className="animate-spin" /> : <Plus />}{saving ? "Saving..." : "Create event"}</Button></DialogFooter>
+          <Field label="Title" span><Input name="title" minLength={3} maxLength={160} required defaultValue={selectedEvent?.title ?? ""} disabled={!canEditSelectedEvent} /></Field>
+          <Field label="Event type"><select name="eventType" className={selectClasses} defaultValue={selectedEvent?.eventType ?? "FOLLOW_UP"} disabled={!canEditSelectedEvent}><option value="SLA">SLA target</option><option value="SITE_VISIT">Site visit</option><option value="MAINTENANCE">Maintenance</option><option value="FOLLOW_UP">Follow-up</option></select></Field>
+          <Field label="Assigned to"><select name="assignedTo" className={selectClasses} defaultValue={selectedEvent ? selectedEvent.assignedTo ?? "" : userId} disabled={!canEditSelectedEvent}><option value="">Unassigned</option>{staff.map((person) => <option key={person.id} value={person.id}>{person.fullName}</option>)}</select></Field>
+          <Field label="Starts"><Input type="datetime-local" name="startsAt" required defaultValue={toLocalInputValue(selectedEvent?.startsAt ?? null)} disabled={!canEditSelectedEvent} /></Field><Field label="Ends"><Input type="datetime-local" name="endsAt" defaultValue={toLocalInputValue(selectedEvent?.endsAt ?? null)} disabled={!canEditSelectedEvent} /></Field>
+          <Field label="Linked ticket" span><select name="ticketId" className={selectClasses} defaultValue={selectedEvent?.ticketId ?? ""} disabled={!canEditSelectedEvent}><option value="">No linked ticket</option>{tickets.map((ticket) => <option key={ticket.id} value={ticket.id}>{ticket.ticketNumber} — {ticket.title}</option>)}</select></Field>
+          <Field label="Location" span><Input name="location" maxLength={200} placeholder="Building, room or online" defaultValue={selectedEvent?.location ?? ""} disabled={!canEditSelectedEvent} /></Field><Field label="Notes" span><Textarea name="notes" maxLength={2000} defaultValue={selectedEvent?.notes ?? ""} disabled={!canEditSelectedEvent} /></Field>
+        </div><DialogFooter><Button type="button" variant="outline" onClick={() => { setOpen(false); setSelectedEvent(null); }}>{selectedEvent && !canEditSelectedEvent ? "Close" : "Cancel"}</Button>{canEditSelectedEvent && <Button type="submit" className="bg-[#4B2C70] text-white" disabled={saving}>{saving ? <LoaderCircle className="animate-spin" /> : selectedEvent ? null : <Plus />}{saving ? "Saving..." : selectedEvent ? "Save changes" : "Create event"}</Button>}</DialogFooter>
       </form></DialogContent></Dialog>
     </div>
   );
 }
 
 function Field({ label, span = false, children }: { label: string; span?: boolean; children: ReactNode }) { return <div className={span ? "space-y-2 sm:col-span-2" : "space-y-2"}><Label>{label}</Label>{children}</div>; }
+function toLocalInputValue(value: string | null) { if (!value) return ""; const date = new Date(value); return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16); }
 function eventStyle(type: ScheduleEvent["eventType"]) { return type === "SLA" ? "bg-red-100 text-red-800" : type === "SITE_VISIT" ? "bg-blue-100 text-blue-800" : type === "MAINTENANCE" ? "bg-amber-100 text-amber-800" : "bg-purple-100 text-[#4B2C70]"; }
 const selectClasses = "h-10 w-full rounded-lg border border-input bg-white px-3 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/50";
