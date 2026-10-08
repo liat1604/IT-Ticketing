@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { BarChart3, BookOpen, BriefcaseBusiness, CalendarDays, ClipboardList, Download, Eye, EyeOff, Gauge, HelpCircle, History, LoaderCircle, LogOut, Menu, Settings, ShieldCheck, UsersRound, Wrench, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, BarChart3, BookOpen, BriefcaseBusiness, CalendarDays, ClipboardList, Download, Eye, EyeOff, Gauge, GraduationCap, HelpCircle, History, Info, LoaderCircle, LogOut, Menu, Settings, ShieldCheck, UsersRound, Wrench, X } from "lucide-react";
 
 import { api, formatValue } from "@/lib/api";
 import type { PortalSection, User } from "@/types";
@@ -11,10 +11,12 @@ import { JobCardsDashboard } from "@/components/job-cards-dashboard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 type NavigationItem = { id: PortalSection; label: string; icon: typeof Gauge; badge?: number };
+type SignInAudience = "REPORTER" | "TECHNICIAN" | "ADMIN";
 
 export default function Application() {
   const [user, setUser] = useState<User | null>(null);
@@ -44,10 +46,10 @@ export default function Application() {
   function navigate(next: PortalSection) { setSection(next); setMobileOpen(false); }
 
   return <div className="min-h-screen bg-[#f7f8fa] lg:grid lg:grid-cols-[264px_minmax(0,1fr)]">
-    <aside className={`z-30 border-r border-white/10 bg-[#4B2C70] text-white lg:sticky lg:top-0 lg:h-screen ${mobileOpen ? "fixed inset-0" : "hidden lg:flex"} flex-col`}>
+    <aside className={`z-30 flex h-dvh flex-col overflow-hidden border-r border-white/10 bg-[#4B2C70] text-white lg:sticky lg:top-0 lg:h-screen ${mobileOpen ? "fixed inset-0" : "hidden lg:flex"}`}>
       <div className="flex items-center justify-between border-b border-white/10 px-6 py-6"><div className="flex items-center gap-3"><img src="/ticket-logo.png?v=2" alt="CSIS IT Support logo" className="size-10 rounded-full object-contain" /><div><p className="font-semibold">CSIS IT Support</p><p className="text-xs text-purple-200">Ticket and Log System</p></div></div><Button size="icon" variant="ghost" className="text-white hover:bg-white/10 lg:hidden" onClick={() => setMobileOpen(false)}><X /></Button></div>
-      <nav className="flex-1 space-y-1 px-3 py-6" aria-label="Portal navigation">{navigation.map((item) => { const Icon = item.icon; const active = section === item.id; return <button key={item.id} onClick={() => navigate(item.id)} className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition ${active ? "bg-white text-[#4B2C70] shadow-sm" : "text-purple-100 hover:bg-white/10 hover:text-white"}`}><Icon className="size-4.5" /><span className="flex-1">{item.label}</span>{item.badge ? <span className={`rounded-full px-2 py-0.5 text-xs ${active ? "bg-purple-100" : "bg-white/15 text-white"}`}>{item.badge}</span> : null}</button>; })}</nav>
-      <div className="border-t border-white/10 p-4"><div className="rounded-xl bg-white/10 p-3"><p className="truncate text-sm font-medium">{user.fullName}</p><p className="mt-0.5 truncate text-xs text-purple-200">{user.email}</p><Badge className="mt-2 bg-white/15 text-white">{formatValue(user.role)}</Badge></div><Button variant="ghost" className="mt-2 w-full justify-start text-purple-100 hover:bg-white/10 hover:text-white" onClick={() => void logout()}><LogOut /> Sign out</Button></div>
+      <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 py-6" aria-label="Portal navigation">{navigation.map((item) => { const Icon = item.icon; const active = section === item.id; return <button key={item.id} onClick={() => navigate(item.id)} className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition ${active ? "bg-white text-[#4B2C70] shadow-sm" : "text-purple-100 hover:bg-white/10 hover:text-white"}`}><Icon className="size-4.5" /><span className="flex-1">{item.label}</span>{item.badge ? <span className={`rounded-full px-2 py-0.5 text-xs ${active ? "bg-purple-100" : "bg-white/15 text-white"}`}>{item.badge}</span> : null}</button>; })}</nav>
+      <div className="shrink-0 border-t border-white/10 p-4"><div className="rounded-xl bg-white/10 p-3"><p className="truncate text-sm font-medium">{user.fullName}</p><p className="mt-0.5 truncate text-xs text-purple-200">{user.email}</p><Badge className="mt-2 bg-white/15 text-white">{formatValue(user.role)}</Badge></div><Button variant="ghost" className="mt-2 h-auto w-full justify-start gap-3 px-3 py-2.5 text-base font-medium text-purple-100 hover:bg-white/10 hover:text-white" onClick={() => void logout()}><LogOut className="size-5" /> Sign out</Button></div>
     </aside>
     <div className="min-w-0">
       <header className="sticky top-0 z-20 flex items-center justify-between border-b bg-white/95 px-4 py-3 backdrop-blur sm:px-6 lg:px-8"><div className="flex items-center gap-3"><Button size="icon" variant="outline" className="lg:hidden" onClick={() => setMobileOpen(true)}><Menu /></Button><div><p className="text-sm font-semibold">{pageTitle(section, user)}</p><p className="hidden text-xs text-muted-foreground sm:block">Secure {formatValue(user.role)} portal</p></div></div><div className="flex items-center gap-2"><span className="hidden text-sm text-muted-foreground md:block">{user.fullName}</span><div className="flex size-9 items-center justify-center rounded-full bg-purple-100 text-sm font-semibold text-[#4B2C70]">{initials(user.fullName)}</div></div></header>
@@ -85,16 +87,18 @@ function pageTitle(section: PortalSection, user: User) {
 }
 
 function AuthenticationPage({ onAuthenticated }: { onAuthenticated: (user: User) => void }) {
-  type AuthMode = "login" | "register" | "forgot" | "reset" | "verify" | "resend";
+  type AuthMode = "landing" | "loading" | "login" | "register" | "forgot" | "reset" | "verify" | "resend";
   const verifyToken = new URLSearchParams(window.location.search).get("verifyToken") ?? "";
   const resetToken = new URLSearchParams(window.location.search).get("resetToken") ?? "";
-  const [mode, setMode] = useState<AuthMode>(verifyToken ? "verify" : resetToken ? "reset" : "login");
+  const [mode, setMode] = useState<AuthMode>(verifyToken ? "verify" : resetToken ? "reset" : "landing");
+  const [audience, setAudience] = useState<SignInAudience | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [fieldError, setFieldError] = useState("");
   const [message, setMessage] = useState("");
 
-  function changeMode(next: AuthMode) { setMode(next); setError(""); setFieldError(""); setMessage(""); }
+  function changeMode(next: AuthMode) { if (next === "landing") setAudience(null); setMode(next); setError(""); setFieldError(""); setMessage(""); }
+  function chooseAudience(next: SignInAudience) { setAudience(next); setMode("loading"); window.setTimeout(() => setMode("login"), 700); }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setSubmitting(true); setError(""); setFieldError(""); setMessage("");
     const data = new FormData(event.currentTarget);
@@ -127,8 +131,107 @@ function AuthenticationPage({ onAuthenticated }: { onAuthenticated: (user: User)
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Authentication failed"); }
     finally { setSubmitting(false); }
   }
-  return <main className="grid min-h-screen lg:grid-cols-2"><section className="hidden bg-[#4B2C70] p-12 text-white lg:flex lg:flex-col lg:justify-between"><div className="flex items-center gap-3"><img src="/ticket-logo.png?v=2" alt="CSIS IT Support logo" className="size-12 rounded-full object-contain" /><div><p className="font-semibold">CSIS IT Support</p><p className="text-sm text-purple-200">North-West University</p></div></div><div className="max-w-lg"><p className="text-sm font-medium uppercase tracking-[0.2em] text-purple-200">One place for every request</p><h1 className="mt-4 text-4xl font-semibold leading-tight">From fault report to resolution, every action is visible and accountable.</h1><p className="mt-5 text-lg leading-8 text-purple-100">A secure support portal for CSIS students, staff, technicians and administrators.</p></div><div className="flex items-center gap-2 text-sm text-purple-200"><ShieldCheck className="size-4" /> Authorised NWU access</div></section>
-    <section className="flex items-center justify-center bg-slate-50 p-4 sm:p-6"><div className="w-full max-w-lg space-y-4 py-4"><Card><CardHeader><img src="/ticket-logo.png?v=2" alt="CSIS IT Support logo" className="mb-3 size-11 rounded-full self-start object-contain lg:hidden" /><CardTitle className="text-2xl">{mode === "login" ? "Welcome back" : mode === "register" ? "Create reporter account" : mode === "forgot" ? "Forgot your password?" : mode === "verify" ? "Verify your email" : mode === "resend" ? "Resend verification email" : "Choose a new password"}</CardTitle><CardDescription>{mode === "login" ? "Sign in using your @mynwu.ac.za email address." : mode === "register" ? "Register, then verify your email to sign in and submit support requests." : mode === "forgot" ? "Enter your NWU email and we will send a secure reset link." : mode === "verify" ? "Confirm your email address to unlock sign-in and ticket creation." : mode === "resend" ? "Enter your NWU email to receive a verification link. Links expire after 24 hours." : "Your reset link is single-use and expires after 15 minutes."}</CardDescription></CardHeader><CardContent>{(mode === "login" || mode === "register") && <div className="mb-6 grid grid-cols-2 rounded-lg bg-slate-100 p-1"><ModeButton active={mode === "login"} onClick={() => changeMode("login")}>Sign in</ModeButton><ModeButton active={mode === "register"} onClick={() => changeMode("register")}>Register</ModeButton></div>}<form className="space-y-4" onSubmit={submit}>{mode === "register" && <Field label="Full name" htmlFor="fullName"><Input id="fullName" name="fullName" autoComplete="name" required /></Field>}{mode !== "reset" && mode !== "verify" && <Field label="NWU email address" htmlFor="email"><Input id="email" name="email" type="email" autoComplete="email" placeholder="name@mynwu.ac.za" required /></Field>}{(mode === "login" || mode === "register" || mode === "reset") && <><Field label={mode === "reset" ? "New password" : "Password"} htmlFor="password"><PasswordInput id="password" name="password" autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "login" ? undefined : 12} required />{mode !== "login" && <p className="text-xs text-muted-foreground">At least 12 characters with uppercase, lowercase and a number.</p>}</Field>{(mode === "register" || mode === "reset") && <Field label={mode === "reset" ? "Confirm new password" : "Confirm password"} htmlFor="confirmPassword"><PasswordInput id="confirmPassword" name="confirmPassword" autoComplete="new-password" minLength={12} required aria-invalid={Boolean(fieldError)} />{fieldError && <p className="text-sm text-red-700" role="alert">{fieldError}</p>}</Field>}</>}{mode === "login" && <div className="-mt-1 text-right"><button type="button" className="text-sm font-medium text-[#4B2C70] hover:underline" onClick={() => changeMode("forgot")}>Forgot password?</button></div>}{error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{error}</p>}{message && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700" role="status">{message}</p>}<Button type="submit" className="h-10 w-full bg-[#4B2C70] text-white hover:bg-[#3d235d]" disabled={submitting || (mode === "forgot" && Boolean(message))}>{submitting && <LoaderCircle className="animate-spin" />}{submitting ? "Please wait..." : mode === "login" ? "Sign in" : mode === "register" ? "Create account" : mode === "forgot" ? "Send reset link" : mode === "verify" ? "Verify email" : mode === "resend" ? "Send verification link" : "Reset password"}</Button>{(mode === "forgot" || mode === "reset" || mode === "verify" || mode === "resend") && <Button type="button" variant="ghost" className="w-full" onClick={() => changeMode("login")}>Back to sign in</Button>}{(mode === "login" || mode === "verify") && <Button type="button" variant="ghost" className="w-full" disabled={submitting} onClick={() => changeMode("resend")}>Resend verification email</Button>}</form></CardContent></Card><LoginHelp /></div></section>
+  if (mode === "landing") return <PortalLanding onChoose={chooseAudience} />;
+  if (mode === "loading") return <PortalLoading audience={audience} />;
+
+  const canRegister = audience === "REPORTER" && (mode === "login" || mode === "register");
+  const audienceDescription = audience === "REPORTER"
+    ? "Sign in with your NWU email to report a fault or follow a support request."
+    : audience === "TECHNICIAN"
+      ? "Access the technician portal with your NWU account."
+      : audience === "ADMIN"
+        ? "Access administration tools with your authorised NWU account."
+        : "Sign in using your @mynwu.ac.za email address.";
+  return <main className="relative isolate flex min-h-dvh items-center justify-center overflow-x-hidden px-4 py-12 sm:px-6">
+    <AuthBackdrop />
+    <AuthBrand />
+    <div className="auth-content-enter relative z-10 w-full max-w-lg">
+      <Card className="border-white/60 bg-white/95 shadow-2xl shadow-[#24113c]/25 backdrop-blur">
+        <CardHeader className="relative pr-14">
+          {mode === "login" && <LoginHelp />}
+          <Button type="button" variant="ghost" className="-ml-3 mb-1 w-fit gap-2 px-3 text-[#4B2C70] hover:bg-purple-50" onClick={() => changeMode("landing")}><ArrowLeft className="size-4" /> Back to role selection</Button>
+          <img src="/ticket-logo.png?v=2" alt="CSIS IT Support logo" className="mb-2 size-11 rounded-full self-start object-contain" />
+          <CardTitle className="text-2xl">{mode === "login" ? "Welcome back" : mode === "register" ? "Create reporter account" : mode === "forgot" ? "Forgot your password?" : mode === "verify" ? "Verify your email" : mode === "resend" ? "Resend verification email" : "Choose a new password"}</CardTitle>
+          <CardDescription>{mode === "login" ? audienceDescription : mode === "register" ? "Register, then verify your email to sign in and submit support requests." : mode === "forgot" ? "Enter your NWU email and we will send a secure reset link." : mode === "verify" ? "Confirm your email address to unlock sign-in and ticket creation." : mode === "resend" ? "Enter your NWU email to receive a verification link. Links expire in 24 hours." : "Your reset link is single-use and expires after 15 minutes."}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {canRegister && <div className="mb-6 grid grid-cols-2 rounded-lg bg-slate-100 p-1"><ModeButton active={mode === "login"} onClick={() => changeMode("login")}>Sign in</ModeButton><ModeButton active={mode === "register"} onClick={() => changeMode("register")}>Register</ModeButton></div>}
+          <form className="space-y-4" onSubmit={submit}>
+            {mode === "register" && <Field label="Full name" htmlFor="fullName"><Input id="fullName" name="fullName" autoComplete="name" required /></Field>}
+            {mode !== "reset" && mode !== "verify" && <Field label="NWU email address" htmlFor="email"><Input id="email" name="email" type="email" autoComplete="email" placeholder="name@mynwu.ac.za" required /></Field>}
+            {(mode === "login" || mode === "register" || mode === "reset") && <><Field label={mode === "reset" ? "New password" : "Password"} htmlFor="password"><PasswordInput id="password" name="password" autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "login" ? undefined : 12} required />{mode !== "login" && <p className="text-xs text-muted-foreground">At least 12 characters with uppercase, lowercase and a number.</p>}</Field>{(mode === "register" || mode === "reset") && <Field label={mode === "reset" ? "Confirm new password" : "Confirm password"} htmlFor="confirmPassword"><PasswordInput id="confirmPassword" name="confirmPassword" autoComplete="new-password" minLength={12} required aria-invalid={Boolean(fieldError)} />{fieldError && <p className="text-sm text-red-700" role="alert">{fieldError}</p>}</Field>}</>}
+            {mode === "login" && <div className="-mt-1 text-right"><button type="button" className="text-sm font-medium text-[#4B2C70] hover:underline" onClick={() => changeMode("forgot")}>Forgot password?</button></div>}
+            {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{error}</p>}
+            {message && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700" role="status">{message}</p>}
+            <Button type="submit" className="h-10 w-full bg-[#4B2C70] text-white hover:bg-[#3d235d]" disabled={submitting || (mode === "forgot" && Boolean(message))}>{submitting && <LoaderCircle className="animate-spin" />}{submitting ? "Please wait..." : mode === "login" ? "Sign in" : mode === "register" ? "Create account" : mode === "forgot" ? "Send reset link" : mode === "verify" ? "Verify email" : mode === "resend" ? "Send verification link" : "Reset password"}</Button>
+            {(mode === "forgot" || mode === "reset" || mode === "verify" || mode === "resend") && <Button type="button" variant="ghost" className="w-full" onClick={() => changeMode("login")}>Back to sign in</Button>}
+            {(mode === "login" || mode === "verify") && <Button type="button" variant="ghost" className="w-full" disabled={submitting} onClick={() => changeMode("resend")}>Resend verification email</Button>}
+          </form>
+        </CardContent>
+      </Card>
+      <p className="mt-5 text-center text-xs text-white/85">© 2026 North-West University · CSIS IT Support</p>
+    </div>
+  </main>;
+}
+
+function AuthBackdrop() {
+  return <div className="fixed inset-0 -z-10 overflow-hidden bg-[#4B2C70]">
+    <img src="/csis-campus-landing.png" alt="" className="absolute inset-0 size-full object-cover object-center" />
+    <div className="absolute inset-0 bg-gradient-to-br from-[#32184f]/80 via-[#4B2C70]/70 to-[#26113e]/85" />
+    <div className="absolute inset-0 bg-[#4B2C70] opacity-20" />
+  </div>;
+}
+
+function AuthBrand() {
+  return <header className="absolute inset-x-0 top-0 z-10 flex items-center justify-between px-5 py-4 text-white sm:px-8 sm:py-5">
+    <div className="flex items-center gap-3"><img src="/ticket-logo.png?v=2" alt="" className="size-10 rounded-full object-contain ring-1 ring-white/40" /><div><p className="font-semibold leading-tight">CSIS IT Support</p><p className="text-xs text-white/75">Ticket and Log System</p></div></div>
+    <div className="hidden text-right text-xs font-medium text-white/80 sm:block">North-West University</div>
+  </header>;
+}
+
+function PortalLanding({ onChoose }: { onChoose: (audience: SignInAudience) => void }) {
+  return <main className="relative isolate flex min-h-dvh flex-col overflow-hidden text-white">
+    <AuthBackdrop />
+    <AuthBrand />
+    <section className="relative z-10 mx-auto my-auto w-full max-w-5xl px-5 pb-10 pt-28 sm:px-8 sm:pt-32">
+      <div className="auth-content-enter mx-auto max-w-3xl text-center">
+        <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-purple-100">Secure support for the CSIS community</p>
+        <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">Welcome to CSIS IT Support</h1>
+        <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-white/85 sm:text-lg">One place to report a fault, coordinate technical work and follow every update. Choose how you use the portal.</p>
+      </div>
+      <div className="auth-content-enter mx-auto mt-9 grid max-w-3xl gap-4 sm:grid-cols-2" style={{ animationDelay: "80ms" }}>
+        <AudienceCard icon={GraduationCap} title="I'm a student or staff member" description="Report a support issue and follow its progress through to resolution." onClick={() => onChoose("REPORTER")} />
+        <AudienceCard icon={Wrench} title="I'm a technician" description="Manage assigned requests, record work and keep requesters informed." onClick={() => onChoose("TECHNICIAN")} />
+      </div>
+      <button type="button" onClick={() => onChoose("ADMIN")} className="auth-content-enter mx-auto mt-4 flex w-full max-w-3xl items-center gap-4 rounded-2xl border border-white/30 bg-white/10 px-5 py-4 text-left shadow-lg backdrop-blur-md transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white" style={{ animationDelay: "150ms" }}>
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white"><ShieldCheck className="size-5" /></span>
+        <span className="min-w-0 flex-1"><span className="block font-semibold">I'm an administrator</span><span className="mt-0.5 block text-sm text-white/75">Manage users, permissions, tickets and system settings.</span></span>
+        <span className="hidden items-center gap-2 text-sm font-semibold sm:flex">Continue <ArrowRight className="size-4" /></span>
+      </button>
+    </section>
+    <footer className="relative z-10 px-4 pb-5 text-center text-xs text-white/75">© 2026 North-West University · CSIS IT Support</footer>
+  </main>;
+}
+
+function AudienceCard({ icon: Icon, title, description, onClick }: { icon: typeof GraduationCap; title: string; description: string; onClick: () => void }) {
+  return <button type="button" onClick={onClick} className="group flex min-h-48 w-full flex-col items-start rounded-2xl bg-white p-6 text-left text-slate-900 shadow-xl shadow-[#211036]/20 transition duration-200 hover:-translate-y-0.5 hover:shadow-2xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/70">
+    <span className="flex size-11 items-center justify-center rounded-xl bg-purple-100 text-[#4B2C70] transition group-hover:bg-[#4B2C70] group-hover:text-white"><Icon className="size-5" /></span>
+    <span className="mt-5 block text-lg font-semibold">{title}</span>
+    <span className="mt-1 block text-sm leading-5 text-slate-600">{description}</span>
+    <span className="mt-auto flex items-center gap-2 pt-5 text-sm font-semibold text-[#4B2C70]">Continue <ArrowRight className="size-4 transition group-hover:translate-x-1" /></span>
+  </button>;
+}
+
+function PortalLoading({ audience }: { audience: SignInAudience | null }) {
+  const audienceName = audience === "REPORTER" ? "reporter" : audience === "TECHNICIAN" ? "technician" : "administrator";
+  return <main className="relative isolate flex min-h-dvh items-center justify-center overflow-hidden px-6 text-center text-white" aria-live="polite" aria-busy="true">
+    <AuthBackdrop />
+    <div className="auth-content-enter relative z-10 flex flex-col items-center">
+      <img src="/ticket-logo.png?v=2" alt="" className="mb-6 size-16 rounded-full object-contain ring-2 ring-white/50" />
+      <LoaderCircle className="size-8 animate-spin text-white/90 motion-reduce:animate-none" aria-hidden="true" />
+      <h1 className="mt-5 text-2xl font-semibold">Opening {audienceName} sign in…</h1>
+      <p className="mt-2 text-sm text-white/80">Preparing your secure CSIS portal.</p>
+    </div>
   </main>;
 }
 
@@ -145,7 +248,17 @@ const loginFaq = [
 ];
 
 function LoginHelp() {
-  return <Card><CardHeader><CardTitle className="flex items-center gap-2 text-lg"><HelpCircle className="size-5 text-[#4B2C70]" /> Help and onboarding</CardTitle><CardDescription>Quick answers before you sign in.</CardDescription></CardHeader><CardContent className="space-y-3">{loginFaq.map((item) => <details key={item.question} className="group rounded-lg border bg-white px-4 py-3"><summary className="cursor-pointer list-none text-sm font-medium text-slate-900 marker:hidden"><span className="flex items-center justify-between gap-3">{item.question}<span className="text-[#4B2C70] transition group-open:rotate-45">+</span></span></summary><p className="mt-2 text-sm leading-6 text-muted-foreground">{item.answer}</p></details>)}<a href="/api/resources/user-guide" download="csis-it-support-user-guide.pdf" className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#4B2C70] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#3d235d]"><Download className="size-4" /> Download user guide (PDF)</a><p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground"><BookOpen className="size-3.5" /> Includes reporter, technician, administrator, workflow, and FAQ guidance.</p></CardContent></Card>;
+  const [open, setOpen] = useState(false);
+
+  return <Dialog open={open} onOpenChange={setOpen}>
+    <Button type="button" variant="outline" size="icon" className="absolute top-4 right-4 size-9 rounded-full border-purple-200 bg-purple-50 text-[#4B2C70] hover:bg-purple-100 hover:text-[#4B2C70]" aria-label="Help and onboarding" title="Help and onboarding" aria-haspopup="dialog" onClick={() => setOpen(true)}>
+      <Info className="size-4" />
+    </Button>
+    <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
+      <DialogHeader><DialogTitle className="flex items-center gap-2"><HelpCircle className="size-5 text-[#4B2C70]" /> Help and onboarding</DialogTitle><DialogDescription>Quick answers before you sign in.</DialogDescription></DialogHeader>
+      <div className="space-y-3">{loginFaq.map((item) => <details key={item.question} className="group rounded-lg border bg-white px-4 py-3"><summary className="cursor-pointer list-none text-sm font-medium text-slate-900 marker:hidden"><span className="flex items-center justify-between gap-3">{item.question}<span className="text-[#4B2C70] transition group-open:rotate-45">+</span></span></summary><p className="mt-2 text-sm leading-6 text-muted-foreground">{item.answer}</p></details>)}<a href="/api/resources/user-guide" download="csis-it-support-user-guide.pdf" className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#4B2C70] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#3d235d]"><Download className="size-4" /> Download user guide (PDF)</a><p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground"><BookOpen className="size-3.5" /> Includes reporter, technician, administrator, workflow, and FAQ guidance.</p></div>
+    </DialogContent>
+  </Dialog>;
 }
 
 function Field({ label, htmlFor, children }: { label: string; htmlFor: string; children: ReactNode }) { return <div className="space-y-2"><Label htmlFor={htmlFor}>{label}</Label>{children}</div>; }

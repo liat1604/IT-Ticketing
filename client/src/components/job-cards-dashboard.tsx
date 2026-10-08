@@ -352,8 +352,8 @@ export function JobCardsDashboard({
           {loading ? (
             <Loading />
           ) : (
-            <div className="overflow-x-auto pb-3">
-              <div className="grid min-w-[1400px] grid-cols-5 gap-4">
+            <div className="pb-3">
+              <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {kanbanColumns.map((column) => {
                   const columnCards = cards.filter(
                     (card) => card.status === column.status,
