@@ -174,11 +174,21 @@ function AuthenticationPage({ onAuthenticated }: { onAuthenticated: (user: User)
   </main>;
 }
 
-function AuthBackdrop() {
+function AuthBackdrop({
+  imageSrc = "/csis-campus-landing.png",
+  landing = false,
+}: {
+  imageSrc?: string;
+  landing?: boolean;
+}) {
   return <div className="fixed inset-0 -z-10 overflow-hidden bg-[#4B2C70]">
-    <img src="/csis-campus-landing.png" alt="" className="absolute inset-0 size-full object-cover object-center" />
-    <div className="absolute inset-0 bg-gradient-to-br from-[#32184f]/80 via-[#4B2C70]/70 to-[#26113e]/85" />
-    <div className="absolute inset-0 bg-[#4B2C70] opacity-20" />
+    <img src={imageSrc} alt="" className="absolute inset-0 size-full object-cover object-center" />
+    <div className={landing
+      ? "absolute inset-0 bg-gradient-to-br from-[#32184f]/55 via-[#4B2C70]/58 to-[#26113e]/72"
+      : "absolute inset-0 bg-gradient-to-br from-[#32184f]/80 via-[#4B2C70]/70 to-[#26113e]/85"} />
+    <div className={landing
+      ? "absolute inset-0 bg-[#4B2C70] opacity-10"
+      : "absolute inset-0 bg-[#4B2C70] opacity-20"} />
   </div>;
 }
 
@@ -191,7 +201,7 @@ function AuthBrand() {
 
 function PortalLanding({ onChoose }: { onChoose: (audience: SignInAudience) => void }) {
   return <main className="relative isolate flex min-h-dvh flex-col overflow-hidden text-white">
-    <AuthBackdrop />
+    <AuthBackdrop imageSrc="/landing-group-jump.png" landing />
     <AuthBrand />
     <section className="relative z-10 mx-auto my-auto w-full max-w-5xl px-5 pb-10 pt-28 sm:px-8 sm:pt-32">
       <div className="auth-content-enter mx-auto max-w-3xl text-center">

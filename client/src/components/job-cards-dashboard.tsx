@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   Clock3,
   CircleStop,
+  GripVertical,
   LoaderCircle,
   Pause,
   Play,
@@ -19,6 +20,15 @@ import {
 } from "lucide-react";
 
 import { TicketDetailDialog } from "@/components/ticket-detail-dialog";
+import {
+  Kanban,
+  KanbanBoard,
+  KanbanColumn,
+  KanbanColumnContent,
+  KanbanItem,
+  KanbanItemHandle,
+  KanbanOverlay,
+} from "@/components/reui/kanban";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -192,6 +202,11 @@ export function JobCardsDashboard({
   const [error, setError] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
+  const [pendingTransition, setPendingTransition] = useState<{ cardId: string; status: KanbanStatus } | null>(null);
+  const [transitionNote, setTransitionNote] = useState("");
+  const [transitionSaving, setTransitionSaving] = useState(false);
+  const [movingCardIds, setMovingCardIds] = useState<string[]>([]);
+  const [moveMessage, setMoveMessage] = useState("");
   const [now, setNow] = useState(() => Date.now());
 
   const load = useCallback(async () => {
@@ -235,6 +250,16 @@ export function JobCardsDashboard({
       ) as Record<string, number>,
     [cards],
   );
+  const boardColumns = useMemo(
+    () =>
+      Object.fromEntries(
+        kanbanColumns.map(({ status: columnStatus }) => [
+          columnStatus,
+          cards.filter((card) => card.status === columnStatus),
+        ]),
+      ) as Record<KanbanStatus, JobCard[]>,
+    [cards],
+  );
   const overdue = cards.filter(
     (card) =>
       card.targetAt &&
@@ -242,6 +267,73 @@ export function JobCardsDashboard({
       !["COMPLETED", "CANCELLED"].includes(card.status),
   ).length;
   const live = cards.find((card) => card.status === "LIVE");
+  const transitionCard = cards.find((card) => card.id === pendingTransition?.cardId) ?? null;
+
+  async function moveCard(card: JobCard, targetStatus: KanbanStatus, note?: string) {
+    const trimmedNote = note?.trim() ?? "";
+    const action = targetStatus === "LIVE"
+      ? (card.status === "SCHEDULED" ? "timer/start" : "timer/resume")
+      : targetStatus === "PAUSED" ? "timer/pause"
+      : targetStatus === "COMPLETED" ? "complete"
+      : targetStatus === "ESCALATED" ? "escalate"
+      : "end";
+    const body = targetStatus === "COMPLETED" ? { completionNote: trimmedNote }
+      : targetStatus === "ESCALATED" ? { reason: trimmedNote }
+      : targetStatus === "CANCELLED" ? { endNote: trimmedNote }
+      : undefined;
+
+    setMovingCardIds((current) => current.includes(card.id) ? current : [...current, card.id]);
+    setMoveMessage("");
+    setCards((current) => current.map((item) => item.id === card.id ? { ...item, status: targetStatus } : item));
+    try {
+      await api("/api/job-cards/" + card.id + "/" + action, {
+        method: "POST",
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      setMoveMessage(card.jobNumber + " moved to " + labelForStatus(targetStatus) + ".");
+      await load();
+      return true;
+    } catch (caught) {
+      setCards((current) => current.map((item) => item.id === card.id ? { ...item, status: card.status } : item));
+      setMoveMessage(caught instanceof Error ? caught.message : "Could not update the job card status.");
+      await load();
+      return false;
+    } finally {
+      setMovingCardIds((current) => current.filter((id) => id !== card.id));
+    }
+  }
+
+  function handleCardDrop(cardId: string, target: unknown) {
+    const card = cards.find((item) => item.id === cardId);
+    if (!card || !isKanbanStatus(target)) return;
+    if (target === card.status) return;
+    if (!canMoveCardTo(card, target)) {
+      setMoveMessage(blockedMoveMessage(card, target));
+      return;
+    }
+    if (needsTransitionNote(target)) {
+      setPendingTransition({ cardId: card.id, status: target });
+      setTransitionNote("");
+      return;
+    }
+    void moveCard(card, target);
+  }
+
+  async function submitTransition(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!pendingTransition || !transitionCard) return;
+    const note = transitionNote.trim();
+    if (note.length < 5) {
+      setMoveMessage("Enter at least 5 characters to continue.");
+      return;
+    }
+    setTransitionSaving(true);
+    if (await moveCard(transitionCard, pendingTransition.status, note)) {
+      setPendingTransition(null);
+      setTransitionNote("");
+    }
+    setTransitionSaving(false);
+  }
 
   return (
     <div className="space-y-6">
@@ -251,7 +343,7 @@ export function JobCardsDashboard({
             Technician job cards
           </h1>
           <p className="text-sm text-muted-foreground">
-            Track linked ticket work and manually captured walk-in jobs.
+            Track linked ticket work and manually captured walk-in jobs. Drag a card to another lane to change its status, or open it for details.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -352,73 +444,80 @@ export function JobCardsDashboard({
           {loading ? (
             <Loading />
           ) : (
-            <div className="pb-3">
-              <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                {kanbanColumns.map((column) => {
-                  const columnCards = cards.filter(
-                    (card) => card.status === column.status,
-                  );
-                  return (
-                    <section
+            <>
+              <Kanban
+                value={boardColumns}
+                onValueChange={(next) => setCards(Object.values(next).flat())}
+                onMove={(event) =>
+                  handleCardDrop(String(event.event.active.id), event.overContainer)
+                }
+                onDragStart={() => setMoveMessage("")}
+                getItemValue={(card) => card.id}
+                restoreOnCancel
+              >
+                <KanbanBoard className="grid min-w-0 grid-cols-1 gap-4 pb-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {kanbanColumns.map((column) => (
+                    <KanbanColumnView
                       key={column.status}
-                      className={`min-h-80 overflow-hidden rounded-2xl border ${column.className}`}
-                      aria-label={`${column.label} job cards`}
-                    >
-                      <header className="flex items-start justify-between gap-3 border-b p-4">
-                        <div>
-                          <h3 className="font-semibold">{column.label}</h3>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {column.helper}
-                          </p>
-                        </div>
-                        <Badge className={column.badgeClass}>
-                          {columnCards.length}
-                        </Badge>
-                      </header>
-                      <div className="min-h-56 space-y-3 p-3">
-                        {columnCards.length === 0 ? (
-                          <div className="rounded-xl border border-dashed border-slate-300 bg-white/60 p-4 text-center text-xs text-muted-foreground">
-                            No job cards
-                          </div>
-                        ) : (
-                          columnCards.map((card) => (
-                            <button
-                              key={card.id}
-                              onClick={() => setSelected(card.id)}
-                              className="w-full rounded-xl border bg-white p-4 text-left transition hover:border-[#4B2C70] hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4B2C70]/40"
-                            >
-                              <div className="flex justify-between gap-2">
-                                <Status status={card.status} />
-                                <Priority value={card.priority} />
-                              </div>
-                              <p className="mt-3 text-xs font-semibold text-[#4B2C70]">
-                                {card.jobNumber} · {card.category.toUpperCase()}
-                              </p>
-                              <h3 className="mt-1 font-semibold">{card.title}</h3>
-                              <p className="mt-2 text-sm text-muted-foreground">
-                                {card.ticketNumber
-                                  ? `${card.ticketNumber} · ${card.reporterName}`
-                                  : `Walk-in · ${card.reporterName}`}
-                              </p>
-                              <p className="mt-3 text-sm">{card.technicianName}</p>
-                              <div className="mt-3 flex justify-between text-xs text-muted-foreground">
-                                <span>{card.location ?? "No location"}</span>
-                                <span className="font-mono">
-                                  {formatDuration(elapsed(card, now))}
-                                </span>
-                              </div>
-                            </button>
-                          ))
-                        )}
+                      column={column}
+                      cards={boardColumns[column.status]}
+                      movingCardIds={movingCardIds}
+                      now={now}
+                      onOpen={setSelected}
+                    />
+                  ))}
+                </KanbanBoard>
+                <KanbanOverlay className="pointer-events-none z-40">
+                  {({ value, variant }) => {
+                    if (variant !== "item") return null;
+                    const card = cards.find((item) => item.id === String(value));
+                    return card ? (
+                      <div className="rotate-1 rounded-xl shadow-2xl">
+                        <JobCardFace card={card} now={now} />
                       </div>
-                    </section>
-                  );
-                })}
-              </div>
-            </div>
+                    ) : null;
+                  }}
+                </KanbanOverlay>
+              </Kanban>
+            {moveMessage && <p className="mt-3 text-sm text-[#4B2C70]" role="status" aria-live="polite">{moveMessage}</p>}
+            </>
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={pendingTransition !== null} onOpenChange={(open) => { if (!open && !transitionSaving) { setPendingTransition(null); setTransitionNote(""); } }}>
+        <DialogContent>
+          <form onSubmit={submitTransition} className="space-y-4">
+            <DialogHeader>
+              <DialogTitle>Move job card to {pendingTransition ? labelForStatus(pendingTransition.status) : "new status"}</DialogTitle>
+              <DialogDescription>
+                {transitionCard ? transitionCard.jobNumber + "  -  " + transitionCard.title : "Add a note to record this status change."}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2">
+              <Label htmlFor="kanban-transition-note">{noteLabelForStatus(pendingTransition?.status)}</Label>
+              <Textarea
+                id="kanban-transition-note"
+                value={transitionNote}
+                onChange={(event) => setTransitionNote(event.target.value)}
+                minLength={5}
+                maxLength={2000}
+                required
+                autoFocus
+                placeholder="Add at least 5 characters"
+              />
+            </div>
+            {moveMessage && <ErrorText text={moveMessage} />}
+            <DialogFooter>
+              <Button type="button" variant="outline" disabled={transitionSaving} onClick={() => { setPendingTransition(null); setTransitionNote(""); }}>Cancel</Button>
+              <Button type="submit" disabled={transitionSaving || transitionNote.trim().length < 5} className="bg-[#4B2C70] text-white hover:bg-[#3d235d]">
+                {transitionSaving ? <LoaderCircle className="animate-spin" /> : null}
+                {transitionSaving ? "Updating..." : "Update status"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <CreateJobCardDialog
         open={createOpen}
@@ -436,6 +535,147 @@ export function JobCardsDashboard({
   );
 }
 
+type KanbanStatus = (typeof kanbanColumns)[number]["status"];
+
+function isKanbanStatus(value: unknown): value is KanbanStatus {
+  return kanbanColumns.some((column) => column.status === value);
+}
+
+function labelForStatus(status: KanbanStatus) {
+  return kanbanColumns.find((column) => column.status === status)?.label ?? formatValue(status);
+}
+
+function noteLabelForStatus(status: KanbanStatus | undefined) {
+  if (status === "COMPLETED") return "Completion note";
+  if (status === "ESCALATED") return "Escalation reason";
+  return "Cancellation reason";
+}
+
+function needsTransitionNote(status: KanbanStatus) {
+  return status === "COMPLETED" || status === "ESCALATED" || status === "CANCELLED";
+}
+
+function canMoveCardTo(card: JobCard, target: KanbanStatus) {
+  if (target === "LIVE") return card.status === "SCHEDULED" || card.status === "PAUSED";
+  if (target === "PAUSED") return card.status === "LIVE";
+  if (target === "COMPLETED") return !["COMPLETED", "CANCELLED"].includes(card.status);
+  if (target === "ESCALATED") return card.isWalkIn && ["SCHEDULED", "LIVE", "PAUSED"].includes(card.status);
+  if (target === "CANCELLED") return card.isWalkIn && !["COMPLETED", "CANCELLED"].includes(card.status);
+  return false;
+}
+
+function blockedMoveMessage(card: JobCard, target: KanbanStatus) {
+  if (!card.isWalkIn && (target === "ESCALATED" || target === "CANCELLED")) {
+    return "Linked ticket job cards must use the ticket workflow for escalation or cancellation.";
+  }
+  return "That status change is unavailable from " + labelForStatus(isKanbanStatus(card.status) ? card.status : "SCHEDULED") + ". Use the job card actions to make a supported change.";
+}
+
+function KanbanColumnView({
+  column,
+  cards,
+  movingCardIds,
+  now,
+  onOpen,
+}: {
+  column: (typeof kanbanColumns)[number];
+  cards: JobCard[];
+  movingCardIds: string[];
+  now: number;
+  onOpen: (id: string) => void;
+}) {
+  return (
+    <KanbanColumn
+      value={column.status}
+      className={"min-h-80 overflow-hidden rounded-2xl border " + column.className}
+      role="group"
+      aria-label={column.label + " job cards"}
+    >
+      <header className="flex items-start justify-between gap-3 border-b p-4">
+        <div>
+          <h3 className="font-semibold">{column.label}</h3>
+          <p className="mt-1 text-xs text-muted-foreground">{column.helper}</p>
+        </div>
+        <Badge className={column.badgeClass}>{cards.length}</Badge>
+      </header>
+      <KanbanColumnContent
+        value={column.status}
+        className="min-h-56 flex-1 gap-3 p-3"
+      >
+        {cards.map((card) => (
+          <DraggableJobCard
+            key={card.id}
+            card={card}
+            now={now}
+            disabled={movingCardIds.includes(card.id)}
+            onOpen={onOpen}
+          />
+        ))}
+        {cards.length === 0 && (
+          <div className="rounded-xl border border-dashed border-slate-300 bg-white/60 p-4 text-center text-xs text-muted-foreground">
+            Drop a job card here
+          </div>
+        )}
+      </KanbanColumnContent>
+    </KanbanColumn>
+  );
+}
+
+function DraggableJobCard({
+  card,
+  now,
+  disabled,
+  onOpen,
+}: {
+  card: JobCard;
+  now: number;
+  disabled: boolean;
+  onOpen: (id: string) => void;
+}) {
+  return (
+    <KanbanItem
+      value={card.id}
+      disabled={disabled}
+      className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-[#4B2C70]/60"
+      aria-label={card.jobNumber + ": " + card.title + ". " + formatValue(card.status) + ". Drag to update status or activate to open details."}
+    >
+      <KanbanItemHandle className="block">
+        <button
+          type="button"
+          onClick={() => onOpen(card.id)}
+          className="block w-full cursor-grab rounded-xl text-left active:cursor-grabbing"
+          aria-label={"Open " + card.jobNumber + ": " + card.title}
+        >
+          <JobCardFace card={card} now={now} />
+        </button>
+      </KanbanItemHandle>
+    </KanbanItem>
+  );
+}
+
+function JobCardFace({ card, now }: { card: JobCard; now: number }) {
+  return (
+    <div className="w-full rounded-xl border bg-white p-4 text-left transition hover:border-[#4B2C70] hover:shadow-sm">
+      <div className="flex justify-between gap-2">
+        <Status status={card.status} />
+        <Priority value={card.priority} />
+      </div>
+      <p className="mt-3 flex items-center gap-1 text-xs font-semibold text-[#4B2C70]">
+        <GripVertical className="size-3.5 shrink-0 text-[#4B2C70]/60" aria-hidden="true" />
+        {card.jobNumber}  -  {card.category.toUpperCase()}
+      </p>
+      <h3 className="mt-1 font-semibold">{card.title}</h3>
+      <p className="mt-2 text-sm text-muted-foreground">
+        {card.ticketNumber ? card.ticketNumber + "  -  " + card.reporterName : "Walk-in  -  " + card.reporterName}
+      </p>
+      <p className="mt-3 text-sm">{card.technicianName}</p>
+      <div className="mt-3 flex justify-between text-xs text-muted-foreground">
+        <span>{card.location ?? "No location"}</span>
+        <span className="font-mono">{formatDuration(elapsed(card, now))}</span>
+      </div>
+    </div>
+  );
+}
 function emptyForm(user: User): JobCardForm {
   return {
     primaryTicketId: "",
