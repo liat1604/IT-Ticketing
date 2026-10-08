@@ -21,6 +21,7 @@ type Overview = {
   byCategory: Array<{ name: string; value: number }>;
   byStatus: Array<{ name: string; value: number }>;
   technicianPerformance: Array<{ id: string; fullName: string; activeTickets: number; resolvedTickets: number; workSeconds: number; handledTickets: number; averageResolutionSeconds: number; manualTickets: number }>;
+  ticketStatistics: Array<{ scope: "opened" | "closed"; group: "team" | "topic" | "agent"; name: string; tickets: number; assigned: number; overdue: number; reopened: number; serviceSeconds: number; averageResponseSeconds: number | null }>;
   resolutionByPriority: Array<{ name: string; resolvedTickets: number; averageResolutionSeconds: number; medianResolutionSeconds: number; withinTarget: number; targetSeconds: number }>;
   resolutionTimeline: Array<{ label: string; created: number; resolved: number }>;
   backlogAge: Array<{ name: string; value: number }>;
@@ -49,6 +50,8 @@ function ReportsOverview({ showReportHeading, role }: { showReportHeading: boole
   const [downloadError, setDownloadError] = useState("");
   const [downloading, setDownloading] = useState<"summary" | "tickets" | "technicians" | null>(null);
   const [downloadOpen, setDownloadOpen] = useState(false);
+  const [statisticsScope, setStatisticsScope] = useState<"opened" | "closed">("opened");
+  const [statisticsGroup, setStatisticsGroup] = useState<"team" | "topic" | "agent">("team");
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -108,6 +111,15 @@ function ReportsOverview({ showReportHeading, role }: { showReportHeading: boole
       <p className="flex items-center gap-2 text-sm text-muted-foreground"><CalendarRange className="size-4" /> Reporting on {formatReportDate(data.periodStart)} to {formatReportDate(data.periodEnd)} ({data.periodDays} days)</p>
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric label="Current active tickets" value={data.metrics.activeTickets} icon={<TicketCheck />} /><Metric label="Created in period" value={data.metrics.createdInPeriod} icon={<Plus />} /><Metric label="Resolved in period" value={data.metrics.resolvedInPeriod} icon={<ShieldCheck />} /><Metric label="Average resolution" value={formatDuration(data.metrics.averageResolutionSeconds)} icon={<Activity />} /></section>
       {showReportHeading && <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric label="Median resolution" value={formatDuration(data.metrics.medianResolutionSeconds)} icon={<Timer />} /><Metric label="Resolution rate" value={`${data.metrics.resolutionRate}%`} icon={<BarChart3 />} /><Metric label="Unassigned tickets" value={data.metrics.unassignedTickets} icon={<AlertTriangle />} /><Metric label="Overdue targets" value={data.metrics.overdueTargets} icon={<CalendarRange />} /></section>}
+      <TicketStatisticsTable
+        data={data.ticketStatistics}
+        scope={statisticsScope}
+        onScopeChange={setStatisticsScope}
+        group={statisticsGroup}
+        onGroupChange={setStatisticsGroup}
+        periodStart={data.periodStart}
+        periodEnd={data.periodEnd}
+      />
       <div className="grid gap-6 xl:grid-cols-2">
         <Card><CardHeader><CardTitle>Tickets by category</CardTitle><CardDescription>Requests created during the selected period</CardDescription></CardHeader><CardContent><CategoryPieChart data={data.byCategory} /></CardContent></Card>
         <Card><CardHeader><CardTitle>Status distribution</CardTitle><CardDescription>Current status of tickets created in the selected period</CardDescription></CardHeader><CardContent className="grid gap-3 sm:grid-cols-2">{data.byStatus.map((item) => <div key={item.name} className="rounded-xl border p-4"><p className="text-sm text-muted-foreground">{formatValue(item.name)}</p><p className="mt-1 text-2xl font-semibold">{item.value}</p></div>)}</CardContent></Card>
@@ -134,6 +146,78 @@ function ExtendedReports({ data }: { data: Overview }) {
     <Card><CardHeader><CardTitle className="flex items-center gap-2"><GitBranch className="text-[#4B2C70]" /> Sub-issue delivery</CardTitle><CardDescription>Progress on larger tickets that were divided into technician work items.</CardDescription></CardHeader><CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><SmallStat label="Parent tickets" value={data.subIssueSummary.parentsWithSubIssues} /><SmallStat label="Total sub-issues" value={data.subIssueSummary.totalSubIssues} /><SmallStat label={`Resolved (${completedSubIssues}%)`} value={data.subIssueSummary.resolvedSubIssues} /><SmallStat label="Overdue work items" value={data.subIssueSummary.overdueWorkItems} /></CardContent></Card>
     <Card><CardHeader><CardTitle>Operational attention</CardTitle><CardDescription>Current queue risks that may need administrator action.</CardDescription></CardHeader><CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><SmallStat label="Escalated" value={data.metrics.escalatedTickets} /><SmallStat label="Critical open" value={data.metrics.criticalTickets} /><SmallStat label="Unassigned" value={data.metrics.unassignedTickets} /><SmallStat label="Overdue targets" value={data.metrics.overdueTargets} /></CardContent></Card>
   </div>;
+}
+
+type TicketStatisticsRow = Overview["ticketStatistics"][number];
+
+function TicketStatisticsTable({
+  data,
+  scope,
+  onScopeChange,
+  group,
+  onGroupChange,
+  periodStart,
+  periodEnd,
+}: {
+  data: TicketStatisticsRow[];
+  scope: "opened" | "closed";
+  onScopeChange: (scope: "opened" | "closed") => void;
+  group: "team" | "topic" | "agent";
+  onGroupChange: (group: "team" | "topic" | "agent") => void;
+  periodStart: string;
+  periodEnd: string;
+}) {
+  const rows = data.filter((row) => row.scope === scope && row.group === group);
+  const heading = scope === "opened" ? "Opened" : "Closed";
+  const groupHeading = group === "team" ? "Department" : group === "topic" ? "Topic" : "Agent";
+  const scopeDescription = scope === "opened"
+    ? "Tickets submitted during the selected reporting period."
+    : "Tickets resolved during the selected reporting period.";
+
+  return <Card>
+    <CardHeader className="gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div>
+        <CardTitle>Ticket statistics</CardTitle>
+        <CardDescription>{scopeDescription} Range: {formatReportDate(periodStart)} – {formatReportDate(periodEnd)}.</CardDescription>
+      </div>
+      <div className="inline-flex w-fit rounded-lg border bg-slate-50 p-1" role="group" aria-label="Choose opened or closed tickets">
+        {(["opened", "closed"] as const).map((item) => <button
+          key={item}
+          type="button"
+          aria-pressed={scope === item}
+          onClick={() => onScopeChange(item)}
+          className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4B2C70]/50 ${scope === item ? "bg-[#4B2C70] text-white shadow-sm" : "text-slate-600 hover:bg-white hover:text-slate-900"}`}
+        >{item === "opened" ? "Opened tickets" : "Closed tickets"}</button>)}
+      </div>
+    </CardHeader>
+    <CardContent>
+      <div className="mb-4 flex flex-wrap gap-1 border-b" role="group" aria-label="Group ticket statistics by">
+        {([
+          ["team", "Department"],
+          ["topic", "Topics"],
+          ["agent", "Agent"],
+        ] as const).map(([item, label]) => <button
+          key={item}
+          type="button"
+          aria-pressed={group === item}
+          onClick={() => onGroupChange(item)}
+          className={`min-w-28 rounded-t-lg border border-b-0 px-4 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#4B2C70]/50 ${group === item ? "-mb-px bg-white font-semibold text-[#4B2C70]" : "border-transparent bg-slate-50 text-slate-600 hover:bg-slate-100"}`}
+        >{label}</button>)}
+      </div>
+      <ResponsiveTable headings={[groupHeading, heading, "Assigned", "Overdue", "Reopened", "Service time", "Response time"]}>
+        {rows.length === 0 ? <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">No {scope} tickets in this reporting period.</td></tr> : rows.map((row) => <tr key={`${row.scope}-${row.group}-${row.name}`} className="border-t transition-colors hover:bg-slate-50/80">
+          <td className="whitespace-nowrap bg-slate-50/70 px-4 py-3 font-medium text-slate-700">{row.name}</td>
+          <td className="px-4 py-3 text-right tabular-nums">{row.tickets}</td>
+          <td className="px-4 py-3 text-right tabular-nums">{row.assigned}</td>
+          <td className="px-4 py-3 text-right tabular-nums">{row.overdue}</td>
+          <td className="px-4 py-3 text-right tabular-nums">{row.reopened}</td>
+          <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{formatDuration(row.serviceSeconds)}</td>
+          <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">{row.averageResponseSeconds === null ? "—" : formatDuration(row.averageResponseSeconds)}</td>
+        </tr>)}
+      </ResponsiveTable>
+      <p className="mt-3 text-xs text-muted-foreground">Response time is the average time until the first public reply from support staff. Service time sums work entries recorded during this period.</p>
+    </CardContent>
+  </Card>;
 }
 
 const categoryChartColors: Record<string, string> = {

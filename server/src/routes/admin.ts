@@ -104,6 +104,7 @@ adminRouter.get("/overview", async (request, response) => {
       byCategory,
       byStatus,
       technicianPerformance,
+      ticketStatistics,
       notifications,
       resolutionByPriority,
       resolutionTimeline,
@@ -212,6 +213,106 @@ adminRouter.get("/overview", async (request, response) => {
            WHERE users.role = 'TECHNICIAN'
              AND users.is_active = TRUE
            ORDER BY "resolvedTickets" DESC, users.full_name`,
+          [periodStart, periodEnd],
+        ),
+        pool.query(
+          `WITH report_tickets AS (
+             SELECT
+               'opened'::text AS scope,
+               tickets.id,
+               tickets.category_id,
+               tickets.assigned_to,
+               tickets.reporter_id,
+               tickets.created_at,
+               tickets.resolved_at,
+               tickets.due_at
+             FROM tickets
+             WHERE tickets.created_at >= $1 AND tickets.created_at < $2
+             UNION ALL
+             SELECT
+               'closed'::text AS scope,
+               tickets.id,
+               tickets.category_id,
+               tickets.assigned_to,
+               tickets.reporter_id,
+               tickets.created_at,
+               tickets.resolved_at,
+               tickets.due_at
+             FROM tickets
+             WHERE tickets.resolved_at >= $1 AND tickets.resolved_at < $2
+           ), reopen_metrics AS (
+             SELECT audit_events.ticket_id, COUNT(*)::INTEGER AS reopened
+             FROM audit_events
+             WHERE audit_events.ticket_id IS NOT NULL
+               AND audit_events.action = 'TICKET_STATUS_CHANGED'
+               AND audit_events.previous_values->>'status' = 'RESOLVED'
+               AND audit_events.new_values->>'status' <> 'RESOLVED'
+               AND audit_events.created_at >= $1 AND audit_events.created_at < $2
+             GROUP BY audit_events.ticket_id
+           ), service_metrics AS (
+             SELECT time_entries.ticket_id,
+                    SUM(EXTRACT(EPOCH FROM (
+                      LEAST(COALESCE(time_entries.stopped_at, CURRENT_TIMESTAMP), $2::timestamptz)
+                      - GREATEST(time_entries.started_at, $1::timestamptz)
+                    )))::INTEGER AS "serviceSeconds"
+             FROM time_entries
+             WHERE time_entries.started_at < $2
+               AND COALESCE(time_entries.stopped_at, CURRENT_TIMESTAMP) > $1
+             GROUP BY time_entries.ticket_id
+           ), response_metrics AS (
+             SELECT comments.ticket_id, MIN(comments.created_at) AS "firstResponseAt"
+             FROM comments
+             JOIN users AS responders ON responders.id = comments.author_id
+             WHERE comments.visibility = 'PUBLIC'
+               AND responders.role <> 'REPORTER'
+             GROUP BY comments.ticket_id
+           ), ticket_metrics AS (
+             SELECT
+               report_tickets.scope,
+               categories.name AS topic,
+               COALESCE(technicians.full_name, 'Unassigned') AS agent,
+               report_tickets.assigned_to IS NOT NULL AS assigned,
+               report_tickets.due_at IS NOT NULL
+                 AND report_tickets.due_at < COALESCE(report_tickets.resolved_at, CURRENT_TIMESTAMP)
+                 AS overdue,
+               COALESCE(reopen_metrics.reopened, 0) AS reopened,
+               COALESCE(service_metrics."serviceSeconds", 0) AS "serviceSeconds",
+               CASE
+                 WHEN response_metrics."firstResponseAt" >= report_tickets.created_at
+                   THEN ROUND(EXTRACT(EPOCH FROM (
+                     response_metrics."firstResponseAt" - report_tickets.created_at
+                   )))::INTEGER
+                 ELSE NULL
+               END AS "responseSeconds"
+             FROM report_tickets
+             JOIN categories ON categories.id = report_tickets.category_id
+             LEFT JOIN users AS technicians ON technicians.id = report_tickets.assigned_to
+             LEFT JOIN reopen_metrics ON reopen_metrics.ticket_id = report_tickets.id
+             LEFT JOIN service_metrics ON service_metrics.ticket_id = report_tickets.id
+             LEFT JOIN response_metrics ON response_metrics.ticket_id = report_tickets.id
+           )
+           SELECT
+             scope,
+             CASE
+               WHEN GROUPING(topic) = 1 AND GROUPING(agent) = 1 THEN 'team'
+               WHEN GROUPING(agent) = 1 THEN 'topic'
+               ELSE 'agent'
+             END AS "group",
+             CASE
+               WHEN GROUPING(topic) = 1 AND GROUPING(agent) = 1 THEN 'IT Support'
+               WHEN GROUPING(agent) = 1 THEN topic
+               ELSE agent
+             END AS name,
+             COUNT(*)::INTEGER AS tickets,
+             COUNT(*) FILTER (WHERE assigned)::INTEGER AS assigned,
+             COUNT(*) FILTER (WHERE overdue)::INTEGER AS overdue,
+             COALESCE(SUM(reopened), 0)::INTEGER AS reopened,
+             COALESCE(SUM("serviceSeconds"), 0)::INTEGER AS "serviceSeconds",
+             ROUND(AVG("responseSeconds") FILTER (WHERE "responseSeconds" IS NOT NULL))::INTEGER
+               AS "averageResponseSeconds"
+           FROM ticket_metrics
+           GROUP BY scope, GROUPING SETS ((), (topic), (agent))
+           ORDER BY scope, "group", name`,
           [periodStart, periodEnd],
         ),
         pool.query(
@@ -336,6 +437,7 @@ adminRouter.get("/overview", async (request, response) => {
       byCategory: byCategory.rows,
       byStatus: byStatus.rows,
       technicianPerformance: technicianPerformance.rows,
+      ticketStatistics: ticketStatistics.rows,
       notifications: notifications.rows[0],
       resolutionByPriority: resolutionByPriority.rows,
       resolutionTimeline: resolutionTimeline.rows,
