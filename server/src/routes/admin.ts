@@ -535,13 +535,20 @@ adminRouter.get("/users", async (request, response) => {
          users.is_active AS "isActive",
          users.created_at AS "createdAt",
          COUNT(DISTINCT reported.id)::INTEGER AS "reportedTickets",
-         COUNT(DISTINCT assigned.id)::INTEGER AS "assignedTickets"
+         COUNT(DISTINCT assigned.id)::INTEGER AS "assignedTickets",
+         EXISTS (
+           SELECT 1
+           FROM tickets AS open_ticket
+           WHERE open_ticket.status <> 'RESOLVED'
+             AND (open_ticket.reporter_id = users.id OR open_ticket.assigned_to = users.id)
+         ) AS "hasOpenTickets"
        FROM users
        LEFT JOIN tickets AS reported ON reported.reporter_id = users.id
        LEFT JOIN tickets AS assigned ON assigned.assigned_to = users.id
-       WHERE $1 = ''
+       WHERE users.deleted_at IS NULL
+         AND ($1 = ''
           OR users.full_name ILIKE '%' || $1 || '%'
-          OR users.email ILIKE '%' || $1 || '%'
+          OR users.email ILIKE '%' || $1 || '%')
        GROUP BY users.id
        ORDER BY users.full_name`,
       [search],
@@ -650,7 +657,8 @@ adminRouter.delete("/users/:userId", async (request, response) => {
   try {
     await client.query("BEGIN");
     const result = await client.query<{ id: string; email: string; full_name: string; role: string }>(
-      `SELECT id, email, full_name, role FROM users WHERE id = $1 FOR UPDATE`, [parsedId.data],
+      `SELECT id, email, full_name, role FROM users
+       WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`, [parsedId.data],
     );
     const user = result.rows[0];
     if (!user) {
@@ -663,20 +671,40 @@ adminRouter.delete("/users/:userId", async (request, response) => {
       response.status(403).json({ error: "Only a system administrator can delete system administrators" });
       return;
     }
-    // Schedule assignees have SET NULL semantics; protect their history explicitly.
-    const scheduled = await client.query(`SELECT 1 FROM schedule_events WHERE assigned_to = $1 LIMIT 1`, [user.id]);
-    if (scheduled.rowCount) {
+    const openTickets = await client.query<{ has_open_tickets: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1 FROM tickets
+         WHERE status <> 'RESOLVED'
+           AND (reporter_id = $1 OR assigned_to = $1)
+       ) AS has_open_tickets`,
+      [user.id],
+    );
+    if (openTickets.rows[0].has_open_tickets) {
       await client.query("ROLLBACK");
-      response.status(409).json({ error: "This account has linked operational history. Deactivate it instead to preserve those records." });
+      response.status(409).json({ error: "Resolve or reassign this account's open tickets before deleting it." });
       return;
     }
-    // Audit rows retain the deleted actor UUID and are immutable. The deletion
-    // event below captures the actor's identifying details before the account
-    // is removed; other operational foreign keys still protect linked history.
-    await client.query(`DELETE FROM users WHERE id = $1`, [user.id]);
+
+    // Retain the user row as a tombstone so ticket, comment and audit history
+    // remains linked while the login identity and outstanding credentials are removed.
+    await client.query(`DELETE FROM sessions WHERE user_id = $1`, [user.id]);
+    await client.query(`DELETE FROM email_verification_tokens WHERE user_id = $1`, [user.id]);
+    await client.query(`DELETE FROM password_reset_tokens WHERE user_id = $1`, [user.id]);
     await client.query(
-      `DELETE FROM notification_outbox WHERE LOWER(recipient_email) = LOWER($1)
-       AND event_type IN ('EMAIL_VERIFICATION_REQUESTED', 'PASSWORD_RESET_REQUESTED')`, [user.email],
+      `DELETE FROM notification_outbox
+       WHERE LOWER(recipient_email) = LOWER($1) AND processed_at IS NULL`, [user.email],
+    );
+    await client.query(
+      `UPDATE users
+       SET full_name = 'Deleted account',
+           email = 'deleted+' || id::text || '@invalid.local',
+           password_hash = encode(gen_random_bytes(32), 'hex'),
+           is_active = FALSE,
+           email_verified_at = NULL,
+           deleted_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [user.id],
     );
     await client.query(
       `INSERT INTO audit_events (actor_id, action, previous_values)
@@ -687,10 +715,6 @@ adminRouter.delete("/users/:userId", async (request, response) => {
     response.status(204).send();
   } catch (error) {
     await client.query("ROLLBACK");
-    if ((error as { code?: string }).code === "23503") {
-      response.status(409).json({ error: "This account has linked tickets or operational history. Deactivate it instead to preserve those records." });
-      return;
-    }
     console.error("User deletion failed", error);
     response.status(500).json({ error: "Could not delete the user account" });
   } finally { client.release(); }
@@ -719,7 +743,7 @@ adminRouter.patch("/users/:userId", async (request, response) => {
     }>(
       `SELECT id, full_name, email, role, is_active
        FROM users
-       WHERE id = $1
+       WHERE id = $1 AND deleted_at IS NULL
        FOR UPDATE`,
       [parsedId.data],
     );
@@ -743,6 +767,24 @@ adminRouter.patch("/users/:userId", async (request, response) => {
       await client.query("ROLLBACK");
       response.status(409).json({ error: "You cannot deactivate your own account" });
       return;
+    }
+
+    if (existing.is_active && parsed.data.isActive === false) {
+      const openTickets = await client.query<{ has_open_tickets: boolean }>(
+        `SELECT EXISTS (
+           SELECT 1 FROM tickets
+           WHERE status <> 'RESOLVED'
+             AND (reporter_id = $1 OR assigned_to = $1)
+         ) AS has_open_tickets`,
+        [existing.id],
+      );
+      if (openTickets.rows[0].has_open_tickets) {
+        await client.query("ROLLBACK");
+        response.status(409).json({
+          error: "Resolve or reassign this account's open tickets before deactivating it.",
+        });
+        return;
+      }
     }
 
     const passwordHash = parsed.data.password
@@ -838,7 +880,18 @@ adminRouter.get("/audit", async (request, response) => {
          audit_events.previous_values AS "previousValues",
          audit_events.new_values AS "newValues",
          audit_events.created_at AS "createdAt",
-         COALESCE(users.full_name, audit_events.previous_values->'deletedActor'->>'fullName') AS "actorName",
+         COALESCE(
+           (
+             SELECT deleted_account.previous_values->>'fullName'
+             FROM audit_events AS deleted_account
+             WHERE deleted_account.action = 'USER_DELETED_BY_ADMIN'
+               AND deleted_account.previous_values->>'userId' = audit_events.actor_id::text
+             ORDER BY deleted_account.created_at DESC
+             LIMIT 1
+           ),
+           users.full_name,
+           audit_events.previous_values->'deletedActor'->>'fullName'
+         ) AS "actorName",
          tickets.ticket_number AS "ticketNumber"
        FROM audit_events
        LEFT JOIN users ON users.id = audit_events.actor_id
@@ -1043,7 +1096,7 @@ adminRouter.get("/backup", requireRole("SYSTEM_ADMIN"), async (request, response
   try {
     const [users, categories, locations, tickets, comments, timeEntries, escalations, auditEvents, scheduleEvents] =
       await Promise.all([
-        pool.query(`SELECT id, email, full_name, role, is_active, created_at, updated_at FROM users ORDER BY created_at`),
+        pool.query(`SELECT id, email, full_name, role, is_active, created_at, updated_at, deleted_at FROM users ORDER BY created_at`),
         pool.query(`SELECT * FROM categories ORDER BY id`),
         pool.query(`SELECT * FROM locations ORDER BY id`),
         pool.query(`SELECT * FROM tickets ORDER BY created_at`),

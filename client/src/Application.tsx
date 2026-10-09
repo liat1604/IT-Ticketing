@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { ArrowLeft, ArrowRight, BarChart3, BookOpen, BriefcaseBusiness, CalendarDays, ClipboardList, Download, Eye, EyeOff, Gauge, GraduationCap, HelpCircle, History, Info, LoaderCircle, LogOut, Menu, Settings, ShieldCheck, UsersRound, Wrench, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, BarChart3, BookOpen, BriefcaseBusiness, CalendarDays, ClipboardList, Download, Eye, EyeOff, Gauge, GraduationCap, HelpCircle, History, LoaderCircle, LogOut, Menu, Settings, ShieldCheck, UsersRound, Wrench, X } from "lucide-react";
 
 import { api, formatValue } from "@/lib/api";
 import type { PortalSection, User } from "@/types";
@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 
 type NavigationItem = { id: PortalSection; label: string; icon: typeof Gauge; badge?: number };
 type SignInAudience = "REPORTER" | "TECHNICIAN" | "ADMIN";
+type AuthField = "fullName" | "email" | "password" | "confirmPassword";
 
 export default function Application() {
   const [user, setUser] = useState<User | null>(null);
@@ -52,9 +53,9 @@ export default function Application() {
       <div className="shrink-0 border-t border-white/10 p-4"><div className="rounded-xl bg-white/10 p-3"><p className="truncate text-sm font-medium">{user.fullName}</p><p className="mt-0.5 truncate text-xs text-purple-200">{user.email}</p><Badge className="mt-2 bg-white/15 text-white">{formatValue(user.role)}</Badge></div><Button variant="ghost" className="mt-2 h-auto w-full justify-start gap-3 px-3 py-2.5 text-base font-medium text-purple-100 hover:bg-white/10 hover:text-white" onClick={() => void logout()}><LogOut className="size-5" /> Sign out</Button></div>
     </aside>
     <div className="min-w-0">
-      <header className="sticky top-0 z-20 flex items-center justify-between border-b bg-white/95 px-4 py-3 backdrop-blur sm:px-6 lg:px-8"><div className="flex items-center gap-3"><Button size="icon" variant="outline" className="lg:hidden" onClick={() => setMobileOpen(true)}><Menu /></Button><div><p className="text-sm font-semibold">{pageTitle(section, user)}</p><p className="hidden text-xs text-muted-foreground sm:block">Secure {formatValue(user.role)} portal</p></div></div><div className="flex items-center gap-2"><span className="hidden text-sm text-muted-foreground md:block">{user.fullName}</span><div className="flex size-9 items-center justify-center rounded-full bg-purple-100 text-sm font-semibold text-[#4B2C70]">{initials(user.fullName)}</div></div></header>
+      <header className="sticky top-0 z-20 flex items-center justify-between border-b bg-white/95 px-4 py-3 backdrop-blur sm:px-6 lg:px-8"><div className="flex items-center gap-3"><Button size="icon" variant="outline" className="lg:hidden" onClick={() => setMobileOpen(true)}><Menu /></Button><div><p className="text-sm font-semibold">{pageTitle(section, user)}</p></div></div><div className="flex items-center gap-2"><span className="hidden text-sm text-muted-foreground md:block">{user.fullName}</span><div className="flex size-9 items-center justify-center rounded-full bg-purple-100 text-sm font-semibold text-[#4B2C70]">{initials(user.fullName)}</div></div></header>
       <main className="mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8">
-        {(user.role === "REPORTER" || user.role === "TECHNICIAN") && <div className="mb-7"><p className="text-sm font-medium uppercase tracking-[0.16em] text-[#4B2C70]">{user.role === "REPORTER" ? "Reporter portal" : "Technician workspace"}</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">{section === "overview" ? `Welcome, ${user.fullName.split(" ")[0]}` : pageTitle(section, user)}</h1><p className="mt-1 text-sm text-muted-foreground">{section === "calendar" ? "Coordinate service commitments and visits." : user.role === "REPORTER" ? "Report faults and follow every update through to resolution." : "Prioritise requests, record work and keep requesters informed."}</p></div>}
+        {(user.role === "REPORTER" || user.role === "TECHNICIAN") && <div className="mb-9"><p className="text-sm font-medium uppercase tracking-[0.16em] text-[#4B2C70]">{user.role === "REPORTER" ? "Reporter portal" : "Technician workspace"}</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">{section === "overview" ? `Welcome, ${user.fullName.split(" ")[0]}` : pageTitle(section, user)}</h1></div>}
         <PortalContent user={user} section={section} onJobCardsChanged={setActiveJobCards} />
       </main>
     </div>
@@ -91,24 +92,42 @@ function AuthenticationPage({ onAuthenticated }: { onAuthenticated: (user: User)
   const verifyToken = new URLSearchParams(window.location.search).get("verifyToken") ?? "";
   const resetToken = new URLSearchParams(window.location.search).get("resetToken") ?? "";
   const [mode, setMode] = useState<AuthMode>(verifyToken ? "verify" : resetToken ? "reset" : "landing");
-  const [audience, setAudience] = useState<SignInAudience | null>(null);
+  const [audience, setAudience] = useState<SignInAudience | null>(verifyToken ? "REPORTER" : null);
   const [submitting, setSubmitting] = useState(false);
+  const [canResendVerification, setCanResendVerification] = useState(false);
   const [error, setError] = useState("");
-  const [fieldError, setFieldError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<AuthField, string>>>({});
   const [message, setMessage] = useState("");
 
-  function changeMode(next: AuthMode) { if (next === "landing") setAudience(null); setMode(next); setError(""); setFieldError(""); setMessage(""); }
+  function changeMode(next: AuthMode) { if (next === "landing") setAudience(null); setMode(next); setCanResendVerification(false); setError(""); setFieldErrors({}); setMessage(""); }
+  function clearFieldError(field: AuthField) { setFieldErrors((current) => { const next = { ...current }; delete next[field]; return next; }); }
   function chooseAudience(next: SignInAudience) { setAudience(next); setMode("loading"); window.setTimeout(() => setMode("login"), 700); }
   async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setSubmitting(true); setError(""); setFieldError(""); setMessage("");
+    event.preventDefault(); setSubmitting(true); setCanResendVerification(false); setError(""); setFieldErrors({}); setMessage("");
     const data = new FormData(event.currentTarget);
     const password = String(data.get("password") ?? "");
     const confirmPassword = String(data.get("confirmPassword") ?? "");
-    if ((mode === "register" || mode === "reset") && password !== confirmPassword) { setFieldError("Passwords do not match."); setSubmitting(false); return; }
+    if (mode === "register") {
+      const fullName = String(data.get("fullName") ?? "").trim();
+      const email = String(data.get("email") ?? "").trim();
+      const emailInput = event.currentTarget.elements.namedItem("email") as HTMLInputElement | null;
+      const validationErrors: Partial<Record<AuthField, string>> = {};
+      if (!fullName) validationErrors.fullName = "Enter your full name.";
+      else if (fullName.length < 2) validationErrors.fullName = "Full name must be at least 2 characters.";
+      if (!email) validationErrors.email = "Enter your NWU email address.";
+      else if (emailInput?.validity.typeMismatch || !email.toLowerCase().endsWith("@mynwu.ac.za")) validationErrors.email = "Enter a valid email address ending in @mynwu.ac.za.";
+      if (!password) validationErrors.password = "Enter a password.";
+      else if (password.length < 12 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) validationErrors.password = "Use at least 12 characters with uppercase, lowercase and a number.";
+      else if (password.length > 128) validationErrors.password = "Password must be 128 characters or fewer.";
+      if (!confirmPassword) validationErrors.confirmPassword = "Confirm your password.";
+      else if (password !== confirmPassword) validationErrors.confirmPassword = "Passwords do not match.";
+      if (Object.keys(validationErrors).length > 0) { setFieldErrors(validationErrors); setSubmitting(false); return; }
+    }
+    if (mode === "reset" && password !== confirmPassword) { setFieldErrors({ confirmPassword: "Passwords do not match." }); setSubmitting(false); return; }
     try {
       if (mode === "verify") {
-        const result = await api<{ message: string }>("/api/auth/verify-email", { method: "POST", body: JSON.stringify({ token: verifyToken }) });
-        window.history.replaceState({}, "", window.location.pathname); changeMode("login"); setMessage(result.message); return;
+        await api<{ message: string }>("/api/auth/verify-email", { method: "POST", body: JSON.stringify({ token: verifyToken }) });
+        window.history.replaceState({}, "", window.location.pathname); changeMode("login"); return;
       }
       if (mode === "resend") {
         const result = await api<{ message: string }>("/api/auth/resend-verification", { method: "POST", body: JSON.stringify({ email: data.get("email") }) });
@@ -128,7 +147,11 @@ function AuthenticationPage({ onAuthenticated }: { onAuthenticated: (user: User)
         changeMode("resend"); setMessage(result.message); return;
       }
       onAuthenticated((await api<{ user: User }>("/api/auth/login", { method: "POST", body: JSON.stringify(body) })).user);
-    } catch (caught) { setError(caught instanceof Error ? caught.message : "Authentication failed"); }
+    } catch (caught) {
+      const errorMessage = caught instanceof Error ? caught.message : "Authentication failed";
+      setError(errorMessage);
+      setCanResendVerification(mode === "login" && errorMessage.toLowerCase().includes("verify your email before signing in"));
+    }
     finally { setSubmitting(false); }
   }
   if (mode === "landing") return <PortalLanding onChoose={chooseAudience} />;
@@ -146,26 +169,25 @@ function AuthenticationPage({ onAuthenticated }: { onAuthenticated: (user: User)
     <AuthBackdrop />
     <AuthBrand />
     <div className="auth-content-enter relative z-10 w-full max-w-lg">
-      <Card className="border-white/60 bg-white/95 shadow-2xl shadow-[#24113c]/25 backdrop-blur">
+      <Card className="border-white/60 bg-white/95 text-slate-900 shadow-2xl shadow-[#24113c]/25 backdrop-blur">
         <CardHeader className="relative pr-14">
           {mode === "login" && <LoginHelp />}
           <Button type="button" variant="ghost" className="-ml-3 mb-1 w-fit gap-2 px-3 text-[#4B2C70] hover:bg-purple-50" onClick={() => changeMode("landing")}><ArrowLeft className="size-4" /> Back to role selection</Button>
-          <img src="/ticket-logo.png?v=2" alt="CSIS IT Support logo" className="mb-2 size-11 rounded-full self-start object-contain" />
           <CardTitle className="text-2xl">{mode === "login" ? "Welcome back" : mode === "register" ? "Create reporter account" : mode === "forgot" ? "Forgot your password?" : mode === "verify" ? "Verify your email" : mode === "resend" ? "Resend verification email" : "Choose a new password"}</CardTitle>
-          <CardDescription>{mode === "login" ? audienceDescription : mode === "register" ? "Register, then verify your email to sign in and submit support requests." : mode === "forgot" ? "Enter your NWU email and we will send a secure reset link." : mode === "verify" ? "Confirm your email address to unlock sign-in and ticket creation." : mode === "resend" ? "Enter your NWU email to receive a verification link. Links expire in 24 hours." : "Your reset link is single-use and expires after 15 minutes."}</CardDescription>
+          <CardDescription className="text-gray-500">{mode === "login" ? audienceDescription : mode === "register" ? "Register, then verify your email to sign in and submit support requests." : mode === "forgot" ? "Enter your NWU email and we will send a secure reset link." : mode === "verify" ? "Confirm your email address to unlock sign-in and ticket creation." : mode === "resend" ? "Enter your NWU email to receive a verification link. Links expire in 24 hours." : "Your reset link is single-use and expires after 15 minutes."}</CardDescription>
         </CardHeader>
         <CardContent>
           {canRegister && <div className="mb-6 grid grid-cols-2 rounded-lg bg-slate-100 p-1"><ModeButton active={mode === "login"} onClick={() => changeMode("login")}>Sign in</ModeButton><ModeButton active={mode === "register"} onClick={() => changeMode("register")}>Register</ModeButton></div>}
-          <form className="space-y-4" onSubmit={submit}>
-            {mode === "register" && <Field label="Full name" htmlFor="fullName"><Input id="fullName" name="fullName" autoComplete="name" required /></Field>}
-            {mode !== "reset" && mode !== "verify" && <Field label="NWU email address" htmlFor="email"><Input id="email" name="email" type="email" autoComplete="email" placeholder="name@mynwu.ac.za" required /></Field>}
-            {(mode === "login" || mode === "register" || mode === "reset") && <><Field label={mode === "reset" ? "New password" : "Password"} htmlFor="password"><PasswordInput id="password" name="password" autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "login" ? undefined : 12} required />{mode !== "login" && <p className="text-xs text-muted-foreground">At least 12 characters with uppercase, lowercase and a number.</p>}</Field>{(mode === "register" || mode === "reset") && <Field label={mode === "reset" ? "Confirm new password" : "Confirm password"} htmlFor="confirmPassword"><PasswordInput id="confirmPassword" name="confirmPassword" autoComplete="new-password" minLength={12} required aria-invalid={Boolean(fieldError)} />{fieldError && <p className="text-sm text-red-700" role="alert">{fieldError}</p>}</Field>}</>}
+          <form className="space-y-4" onSubmit={submit} noValidate={mode === "register"}>
+            {mode === "register" && <Field label="Full name" htmlFor="fullName"><Input id="fullName" name="fullName" autoComplete="name" aria-invalid={Boolean(fieldErrors.fullName)} onChange={() => clearFieldError("fullName")} required />{fieldErrors.fullName && <p className="text-sm text-red-700" role="alert">{fieldErrors.fullName}</p>}</Field>}
+            {mode !== "reset" && mode !== "verify" && <Field label="NWU email address" htmlFor="email"><Input id="email" name="email" type="email" autoComplete="email" placeholder="name@mynwu.ac.za" className="border-slate-200 bg-slate-50/50 text-slate-900 placeholder:text-gray-500" aria-invalid={Boolean(fieldErrors.email)} onChange={() => clearFieldError("email")} required />{fieldErrors.email && <p className="text-sm text-red-700" role="alert">{fieldErrors.email}</p>}</Field>}
+            {(mode === "login" || mode === "register" || mode === "reset") && <><Field label={mode === "reset" ? "New password" : "Password"} htmlFor="password"><PasswordInput id="password" name="password" autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={mode === "login" ? undefined : 12} className="border-slate-200 bg-slate-50/50 text-slate-900 placeholder:text-gray-500" aria-invalid={Boolean(fieldErrors.password)} onChange={() => clearFieldError("password")} required />{mode !== "login" && <p className="text-xs text-muted-foreground">At least 12 characters with uppercase, lowercase and a number.</p>}{fieldErrors.password && <p className="text-sm text-red-700" role="alert">{fieldErrors.password}</p>}</Field>{(mode === "register" || mode === "reset") && <Field label={mode === "reset" ? "Confirm new password" : "Confirm password"} htmlFor="confirmPassword"><PasswordInput id="confirmPassword" name="confirmPassword" autoComplete="new-password" minLength={12} className="border-slate-200 bg-slate-50/50 text-slate-900 placeholder:text-gray-500" required aria-invalid={Boolean(fieldErrors.confirmPassword)} onChange={() => clearFieldError("confirmPassword")} />{fieldErrors.confirmPassword && <p className="text-sm text-red-700" role="alert">{fieldErrors.confirmPassword}</p>}</Field>}</>}
             {mode === "login" && <div className="-mt-1 text-right"><button type="button" className="text-sm font-medium text-[#4B2C70] hover:underline" onClick={() => changeMode("forgot")}>Forgot password?</button></div>}
             {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{error}</p>}
             {message && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700" role="status">{message}</p>}
             <Button type="submit" className="h-10 w-full bg-[#4B2C70] text-white hover:bg-[#3d235d]" disabled={submitting || (mode === "forgot" && Boolean(message))}>{submitting && <LoaderCircle className="animate-spin" />}{submitting ? "Please wait..." : mode === "login" ? "Sign in" : mode === "register" ? "Create account" : mode === "forgot" ? "Send reset link" : mode === "verify" ? "Verify email" : mode === "resend" ? "Send verification link" : "Reset password"}</Button>
-            {(mode === "forgot" || mode === "reset" || mode === "verify" || mode === "resend") && <Button type="button" variant="ghost" className="w-full" onClick={() => changeMode("login")}>Back to sign in</Button>}
-            {(mode === "login" || mode === "verify") && <Button type="button" variant="ghost" className="w-full" disabled={submitting} onClick={() => changeMode("resend")}>Resend verification email</Button>}
+            {(mode === "forgot" || mode === "reset" || mode === "resend") && <Button type="button" variant="ghost" className="w-full text-[#4B2C70] hover:bg-purple-50 hover:text-[#3d235d]" onClick={() => changeMode("login")}>Back to sign in</Button>}
+            {mode === "login" && canResendVerification && <Button type="button" variant="ghost" className="w-full text-[#4B2C70] hover:bg-purple-50 hover:text-[#3d235d]" disabled={submitting} onClick={() => changeMode("resend")}>Resend verification email</Button>}
           </form>
         </CardContent>
       </Card>
@@ -236,8 +258,8 @@ function PortalLoading({ audience }: { audience: SignInAudience | null }) {
   const audienceName = audience === "REPORTER" ? "reporter" : audience === "TECHNICIAN" ? "technician" : "administrator";
   return <main className="relative isolate flex min-h-dvh items-center justify-center overflow-hidden px-6 text-center text-white" aria-live="polite" aria-busy="true">
     <AuthBackdrop />
+    <AuthBrand />
     <div className="auth-content-enter relative z-10 flex flex-col items-center">
-      <img src="/ticket-logo.png?v=2" alt="" className="mb-6 size-16 rounded-full object-contain ring-2 ring-white/50" />
       <LoaderCircle className="size-8 animate-spin text-white/90 motion-reduce:animate-none" aria-hidden="true" />
       <h1 className="mt-5 text-2xl font-semibold">Opening {audienceName} sign in…</h1>
       <p className="mt-2 text-sm text-white/80">Preparing your secure CSIS portal.</p>
@@ -247,7 +269,7 @@ function PortalLoading({ audience }: { audience: SignInAudience | null }) {
 
 function PasswordInput(props: React.ComponentProps<typeof Input>) {
   const [visible, setVisible] = useState(false);
-  return <div className="relative"><Input {...props} type={visible ? "text" : "password"} className={`pr-11 ${props.className ?? ""}`} /><button type="button" className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4B2C70]" onClick={() => setVisible((current) => !current)} aria-label={visible ? "Hide password" : "Show password"} aria-pressed={visible}>{visible ? <EyeOff className="size-4" aria-hidden="true" /> : <Eye className="size-4" aria-hidden="true" />}</button></div>;
+  return <div className="relative"><Input {...props} type={visible ? "text" : "password"} className={`pr-11 ${props.className ?? ""}`} /><button type="button" className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-md text-gray-500 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4B2C70]" onClick={() => setVisible((current) => !current)} aria-label={visible ? "Hide password" : "Show password"} aria-pressed={visible}>{visible ? <EyeOff className="size-4" aria-hidden="true" /> : <Eye className="size-4" aria-hidden="true" />}</button></div>;
 }
 
 const loginFaq = [
@@ -261,8 +283,8 @@ function LoginHelp() {
   const [open, setOpen] = useState(false);
 
   return <Dialog open={open} onOpenChange={setOpen}>
-    <Button type="button" variant="outline" size="icon" className="absolute top-4 right-4 size-9 rounded-full border-purple-200 bg-purple-50 text-[#4B2C70] hover:bg-purple-100 hover:text-[#4B2C70]" aria-label="Help and onboarding" title="Help and onboarding" aria-haspopup="dialog" onClick={() => setOpen(true)}>
-      <Info className="size-4" />
+    <Button type="button" variant="ghost" size="icon" className="absolute top-4 right-4 size-9 rounded-full text-[#4B2C70] hover:bg-purple-50 hover:text-[#4B2C70]" aria-label="Help and onboarding" title="Help and onboarding" aria-haspopup="dialog" onClick={() => setOpen(true)}>
+      <HelpCircle className="size-4" />
     </Button>
     <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
       <DialogHeader><DialogTitle className="flex items-center gap-2"><HelpCircle className="size-5 text-[#4B2C70]" /> Help and onboarding</DialogTitle><DialogDescription>Quick answers before you sign in.</DialogDescription></DialogHeader>
@@ -272,5 +294,5 @@ function LoginHelp() {
 }
 
 function Field({ label, htmlFor, children }: { label: string; htmlFor: string; children: ReactNode }) { return <div className="space-y-2"><Label htmlFor={htmlFor}>{label}</Label>{children}</div>; }
-function ModeButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) { return <Button type="button" variant={active ? "default" : "ghost"} className={active ? "bg-[#4B2C70] text-white hover:bg-[#3d235d]" : ""} onClick={onClick}>{children}</Button>; }
+function ModeButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) { return <Button type="button" variant={active ? "default" : "ghost"} className={active ? "bg-[#4B2C70] text-white hover:bg-[#3d235d]" : "text-slate-700 hover:bg-white hover:text-[#4B2C70]"} onClick={onClick}>{children}</Button>; }
 function initials(name: string) { return name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase(); }

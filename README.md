@@ -36,6 +36,7 @@ Get-Content -LiteralPath ".\server\db\migrations\007_password_resets.sql" -Raw |
 Get-Content -LiteralPath ".\server\db\migrations\008_email_verification.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
 Get-Content -LiteralPath ".\server\db\migrations\009_immutable_audit_events.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
 Get-Content -LiteralPath ".\server\db\migrations\010_job_card_escalation.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
+Get-Content -LiteralPath ".\server\db\migrations\011_user_account_tombstones.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
 npm --prefix server run seed-demo
 ```
 
@@ -184,7 +185,7 @@ and does not create a session. Links expire in 24 hours and are single-use;
 users can request another from **Resend verification email** on the sign-in page.
 Password resets do not bypass email verification.
 
-Apply migrations 006 through 010 after the earlier migrations, before starting
+Apply migrations 006 through 011 after the earlier migrations, before starting
 the updated server. Apply 008 once: it preserves access for existing accounts.
 New accounts default to unverified. Development seeds and the system-admin
 bootstrap explicitly provision trusted accounts with access.
@@ -195,6 +196,7 @@ Get-Content -LiteralPath ".\server\db\migrations\007_password_resets.sql" -Raw |
 Get-Content -LiteralPath ".\server\db\migrations\008_email_verification.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
 Get-Content -LiteralPath ".\server\db\migrations\009_immutable_audit_events.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
 Get-Content -LiteralPath ".\server\db\migrations\010_job_card_escalation.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
+Get-Content -LiteralPath ".\server\db\migrations\011_user_account_tombstones.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
 ```
 
 Set `APP_BASE_URL` to the externally accessible frontend URL and configure

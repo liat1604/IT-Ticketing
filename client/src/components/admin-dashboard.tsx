@@ -30,7 +30,7 @@ type Overview = {
   notifications: { pending: number; sent: number; failed: number };
 };
 type AdminTicket = { id: string; ticketNumber: string; title: string; priority: string; status: string; source: string; category: string; reporterName: string; reporterEmail: string; technicianName: string | null; parentTicketNumber: string | null; dueAt: string | null; createdAt: string };
-type ManagedUser = User & { isActive: boolean; createdAt: string; reportedTickets: number; assignedTickets: number };
+type ManagedUser = User & { isActive: boolean; createdAt: string; reportedTickets: number; assignedTickets: number; hasOpenTickets: boolean };
 type AuditEvent = { id: number; action: string; createdAt: string; actorName: string | null; ticketNumber: string | null; previousValues: Record<string, unknown> | null; newValues: Record<string, unknown> | null };
 
 export function AdminDashboard({ section, user }: { section: PortalSection; user: User }) {
@@ -96,7 +96,7 @@ function ReportsOverview({ showReportHeading, role }: { showReportHeading: boole
 
   if (loading && !data) return <LoadingPanel label="Loading operational reporting" />;
   return <div className="space-y-6">
-    <div><h1 className="text-2xl font-semibold tracking-tight">{showReportHeading ? "Reports and analytics" : "Operational overview"}</h1><p className="text-sm text-muted-foreground">Live service data from PostgreSQL—not demonstration values.</p></div>
+    <div className="pb-4"><h1 className="text-2xl font-semibold tracking-tight">{showReportHeading ? "Reports and analytics" : "Operational overview"}</h1></div>
     <Card>
       <CardContent className="grid gap-4 pt-6 xl:grid-cols-[190px_170px_170px_1fr] xl:items-end">
         <Field label="Period"><select value={period} onChange={(event) => selectPeriod(event.target.value)} className={`${selectClasses} w-full`}><option value="30">Last 30 days</option><option value="90">Last 90 days</option><option value="365">Last year</option><option value="custom">Custom dates</option></select></Field>
@@ -319,7 +319,7 @@ function TicketAdministration({ role }: { role: UserRole }) {
   const [tickets, setTickets] = useState<AdminTicket[]>([]); const [search, setSearch] = useState(""); const [status, setStatus] = useState("ALL"); const [priority, setPriority] = useState("ALL"); const [loading, setLoading] = useState(true); const [error, setError] = useState(""); const [message, setMessage] = useState(""); const [selected, setSelected] = useState<string | null>(null);
   const load = useCallback(async () => { setLoading(true); setError(""); try { const params = new URLSearchParams({ search, status, priority }); setTickets((await api<{ tickets: AdminTicket[] }>(`/api/admin/tickets?${params}`)).tickets); } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not load tickets"); } finally { setLoading(false); } }, [priority, search, status]);
   useEffect(() => { const timer = window.setTimeout(() => void load(), 200); return () => window.clearTimeout(timer); }, [load]);
-  return <div className="space-y-6"><div className="flex flex-wrap items-center justify-between gap-4"><div><h1 className="text-2xl font-semibold tracking-tight">All tickets</h1><p className="text-sm text-muted-foreground">Search and review the full operational ticket register.</p></div><CreateTicketDialog onCreated={async (ticket) => { setMessage(`${ticket.ticketNumber} was created and added to the ticket queue.`); await load(); }} /></div>
+  return <div className="space-y-6"><div className="flex flex-wrap items-center justify-between gap-4"><div className="pb-4"><h1 className="text-2xl font-semibold tracking-tight">All tickets</h1></div><CreateTicketDialog onCreated={async (ticket) => { setMessage(`${ticket.ticketNumber} was created and added to the ticket queue.`); await load(); }} /></div>
     {message && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700" role="status">{message}</p>}
     <Card><CardHeader><div className="grid gap-3 md:grid-cols-[1fr_190px_190px_auto]"><label className="relative"><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input value={search} onChange={(event) => setSearch(event.target.value)} className="pl-9" placeholder="Ticket, requester or email" /></label><Filter value={status} onChange={setStatus} allLabel="All statuses" values={["NEW","ASSIGNED","IN_PROGRESS","AWAITING_FEEDBACK","ESCALATED","RESOLVED"]} /><Filter value={priority} onChange={setPriority} allLabel="All priorities" values={["CRITICAL","HIGH","MEDIUM","LOW"]} /><Button variant="outline" onClick={() => void load()}><RefreshCw className={loading ? "animate-spin" : ""} /> Refresh</Button></div></CardHeader><CardContent>{error && <ErrorMessage>{error}</ErrorMessage>}{loading && tickets.length === 0 ? <LoadingPanel label="Loading tickets" /> : <ResponsiveTable headings={["Ticket","Requester","Category","Priority","Status","Assigned","Created",""]}>{tickets.map((ticket) => <tr key={ticket.id} className="border-t"><td className="px-4 py-3"><p className="font-semibold text-[#4B2C70]">{ticket.ticketNumber}</p><p className="max-w-56 truncate text-sm">{ticket.title}</p></td><td className="px-4 py-3"><p>{ticket.reporterName}</p><p className="text-xs text-muted-foreground">{ticket.reporterEmail}</p></td><td className="px-4 py-3">{ticket.category}</td><td className="px-4 py-3"><Priority priority={ticket.priority} /></td><td className="px-4 py-3"><Badge variant="secondary">{formatValue(ticket.status)}</Badge></td><td className="px-4 py-3">{ticket.technicianName ?? "Unassigned"}</td><td className="px-4 py-3 text-sm">{relativeTime(ticket.createdAt)}</td><td className="px-4 py-3"><Button size="icon" variant="ghost" aria-label={`View ${ticket.ticketNumber}`} onClick={() => setSelected(ticket.id)}><Eye /></Button></td></tr>)}</ResponsiveTable>}</CardContent></Card>
     <TicketDetailDialog ticketId={selected} open={selected !== null} role={role} onOpenChange={(open) => !open && setSelected(null)} onChanged={load} />
@@ -328,36 +328,265 @@ function TicketAdministration({ role }: { role: UserRole }) {
 
 function UserAdministration({ currentUser }: { currentUser: User }) {
   const [deleteTarget, setDeleteTarget] = useState<ManagedUser | null>(null);
+  const [deleteStep, setDeleteStep] = useState<"review" | "final" | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
-  async function deleteUser() {
-    if (!deleteTarget || deleting) return;
-    setDeleting(true); setDeleteError(""); setError(""); setMessage("");
-    try {
-      await api(`/api/admin/users/${deleteTarget.id}`, { method: "DELETE" });
-      setMessage(`${deleteTarget.fullName}'s account was deleted.`);
-      setDeleteTarget(null);
-      await load();
-    } catch (caught) { setDeleteError(caught instanceof Error ? caught.message : "Could not delete user"); }
-    finally { setDeleting(false); }
-  }
-  const [users, setUsers] = useState<ManagedUser[]>([]); const [search, setSearch] = useState(""); const [loading, setLoading] = useState(true); const [error, setError] = useState(""); const [message, setMessage] = useState(""); const [open, setOpen] = useState(false); const [saving, setSaving] = useState(false);
-  const load = useCallback(async () => { setLoading(true); try { setUsers((await api<{ users: ManagedUser[] }>(`/api/admin/users?search=${encodeURIComponent(search)}`)).users); } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not load users"); } finally { setLoading(false); } }, [search]);
-  useEffect(() => { const timer = window.setTimeout(() => void load(), 200); return () => window.clearTimeout(timer); }, [load]);
-  async function createUser(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setSaving(true); setError(""); const form = event.currentTarget; const data = new FormData(form); try { await api("/api/admin/users", { method: "POST", body: JSON.stringify({ fullName: data.get("fullName"), email: data.get("email"), password: data.get("password"), role: data.get("role") }) }); setOpen(false); form.reset(); setMessage("User account created successfully."); await load(); } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not create user"); } finally { setSaving(false); } }
-  async function updateUser(user: ManagedUser, changes: { role?: UserRole; isActive?: boolean }) { setError(""); setMessage(""); try { await api(`/api/admin/users/${user.id}`, { method: "PATCH", body: JSON.stringify(changes) }); setMessage(`${user.fullName}'s account was updated.`); await load(); } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not update user"); } }
-  return <div className="space-y-6"><div className="flex flex-wrap items-center justify-between gap-4"><div><h1 className="text-2xl font-semibold tracking-tight">Users and permissions</h1><p className="text-sm text-muted-foreground">Create accounts, assign roles, control access and delete unused accounts.</p></div><Button className="bg-[#4B2C70] text-white" onClick={() => setOpen(true)}><Plus /> Create user</Button></div>
-    {error && <ErrorMessage>{error}</ErrorMessage>}{message && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{message}</p>}
-    <Card><CardHeader><label className="relative max-w-md"><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input value={search} onChange={(event) => setSearch(event.target.value)} className="pl-9" placeholder="Search name or NWU email" /></label></CardHeader><CardContent>{loading && users.length === 0 ? <LoadingPanel label="Loading users" /> : <ResponsiveTable headings={["User","Role","Status","Ticket activity","Created",""]}>{users.map((managed) => { const systemRestricted = currentUser.role !== "SYSTEM_ADMIN" && managed.role === "SYSTEM_ADMIN"; return <tr key={managed.id} className="border-t"><td className="px-4 py-3"><p className="font-medium">{managed.fullName}</p><p className="text-xs text-muted-foreground">{managed.email}</p></td><td className="px-4 py-3"><select value={managed.role} disabled={systemRestricted} onChange={(event) => void updateUser(managed, { role: event.target.value as UserRole })} className={selectClasses}>{(["REPORTER","TECHNICIAN","ADMIN",...(currentUser.role === "SYSTEM_ADMIN" ? ["SYSTEM_ADMIN"] : [])] as UserRole[]).map((role) => <option key={role} value={role}>{formatValue(role)}</option>)}</select></td><td className="px-4 py-3"><Badge className={managed.isActive ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"}>{managed.isActive ? "Active" : "Inactive"}</Badge></td><td className="px-4 py-3 text-sm">{managed.reportedTickets} reported · {managed.assignedTickets} assigned</td><td className="px-4 py-3 text-sm">{new Date(managed.createdAt).toLocaleDateString()}</td><td className="px-4 py-3"><Button size="sm" variant="outline" disabled={managed.id === currentUser.id || systemRestricted} onClick={() => void updateUser(managed, { isActive: !managed.isActive })}>{managed.isActive ? "Deactivate" : "Activate"}</Button><Button size="sm" variant="destructive" className="ml-2" disabled={managed.id === currentUser.id || systemRestricted || deleting} onClick={() => { setDeleteError(""); setDeleteTarget(managed); }}><Trash2 /> Delete</Button></td></tr>; })}</ResponsiveTable>}</CardContent></Card>
-    <Dialog open={Boolean(deleteTarget)} onOpenChange={(next) => { if (!next && !deleting) setDeleteTarget(null); }}><DialogContent className="sm:max-w-lg"><DialogHeader><DialogTitle>Delete user account?</DialogTitle><DialogDescription>Permanently delete {deleteTarget?.fullName}'s account ({deleteTarget?.email}). This cannot be undone. The user will lose access immediately. Accounts with linked tickets or operational history must be deactivated instead. Audit history is retained.</DialogDescription></DialogHeader>{deleteError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{deleteError}</p>}<DialogFooter><Button variant="outline" disabled={deleting} onClick={() => setDeleteTarget(null)}>Cancel</Button><Button variant="destructive" disabled={deleting} onClick={() => void deleteUser()}>{deleting ? <LoaderCircle className="animate-spin" /> : <Trash2 />}{deleting ? "Deleting..." : "Delete account"}</Button></DialogFooter></DialogContent></Dialog>    <Dialog open={open} onOpenChange={(next) => !saving && setOpen(next)}><DialogContent className="sm:max-w-lg"><form onSubmit={createUser}><DialogHeader><DialogTitle>Create user account</DialogTitle><DialogDescription>Provision secure access using an NWU email address.</DialogDescription></DialogHeader><div className="space-y-4 py-5"><Field label="Full name"><Input name="fullName" minLength={2} maxLength={120} required /></Field><Field label="NWU email"><Input name="email" type="email" placeholder="name@mynwu.ac.za" required /></Field><Field label="Temporary password"><Input name="password" type="password" minLength={12} required /><p className="text-xs text-muted-foreground">At least 12 characters with uppercase, lowercase and a number.</p></Field><Field label="Role"><select name="role" className={selectClasses} defaultValue="REPORTER"><option value="REPORTER">Reporter</option><option value="TECHNICIAN">Technician</option><option value="ADMIN">Administrator</option>{currentUser.role === "SYSTEM_ADMIN" && <option value="SYSTEM_ADMIN">System administrator</option>}</select></Field></div><DialogFooter><Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button type="submit" className="bg-[#4B2C70] text-white" disabled={saving}>{saving ? <LoaderCircle className="animate-spin" /> : <UserCog />}{saving ? "Creating..." : "Create account"}</Button></DialogFooter></form></DialogContent></Dialog>
-  </div>;
-}
+  const [users, setUsers] = useState<ManagedUser[]>([]);
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
 
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const result = await api<{ users: ManagedUser[] }>("/api/admin/users?search=" + encodeURIComponent(search));
+      setUsers(result.users);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not load users");
+    } finally {
+      setLoading(false);
+    }
+  }, [search]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => void load(), 200);
+    return () => window.clearTimeout(timer);
+  }, [load]);
+
+  async function createUser(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    try {
+      await api("/api/admin/users", {
+        method: "POST",
+        body: JSON.stringify({
+          fullName: data.get("fullName"),
+          email: data.get("email"),
+          password: data.get("password"),
+          role: data.get("role"),
+        }),
+      });
+      setOpen(false);
+      form.reset();
+      setMessage("User account created successfully.");
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not create user");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function updateUser(user: ManagedUser, changes: { role?: UserRole; isActive?: boolean }) {
+    setError("");
+    setMessage("");
+    try {
+      await api("/api/admin/users/" + user.id, { method: "PATCH", body: JSON.stringify(changes) });
+      setMessage(user.fullName + "'s account was updated.");
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not update user");
+    }
+  }
+
+  async function deleteUser() {
+    if (!deleteTarget || deleting || deleteStep !== "final") return;
+    setDeleting(true);
+    setDeleteError("");
+    setError("");
+    setMessage("");
+    try {
+      await api("/api/admin/users/" + deleteTarget.id, { method: "DELETE" });
+      setMessage(deleteTarget.fullName + "'s account was deleted. Ticket and audit history were retained.");
+      setDeleteTarget(null);
+      setDeleteStep(null);
+      await load();
+    } catch (caught) {
+      setDeleteError(caught instanceof Error ? caught.message : "Could not delete user");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  function closeDeleteDialog() {
+    if (deleting) return;
+    setDeleteStep(null);
+    setDeleteTarget(null);
+    setDeleteError("");
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="pb-4">
+          <h1 className="text-2xl font-semibold tracking-tight">Users and permissions</h1>
+        </div>
+        <Button className="bg-[#4B2C70] text-white" onClick={() => setOpen(true)}><Plus /> Create user</Button>
+      </div>
+
+      {error && <ErrorMessage>{error}</ErrorMessage>}
+      {message && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700" role="status">{message}</p>}
+
+      <Card>
+        <CardHeader>
+          <label className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input value={search} onChange={(event) => setSearch(event.target.value)} className="pl-9" placeholder="Search name or NWU email" />
+          </label>
+        </CardHeader>
+        <CardContent>
+          {loading && users.length === 0 ? <LoadingPanel label="Loading users" /> : (
+            <ResponsiveTable headings={["User", "Role", "Status", "Ticket activity", "Created", ""]}>
+              {users.map((managed) => {
+                const systemRestricted = currentUser.role !== "SYSTEM_ADMIN" && managed.role === "SYSTEM_ADMIN";
+                const cannotDeactivate = managed.isActive && managed.hasOpenTickets;
+                const ticketRestriction = managed.hasOpenTickets
+                  ? "Resolve or reassign open tickets before deactivating or deleting this account."
+                  : undefined;
+                return (
+                  <tr key={managed.id} className="border-t">
+                    <td className="px-4 py-3">
+                      <p className="font-medium">{managed.fullName}</p>
+                      <p className="text-xs text-muted-foreground">{managed.email}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <select
+                        value={managed.role}
+                        disabled={systemRestricted}
+                        onChange={(event) => void updateUser(managed, { role: event.target.value as UserRole })}
+                        className={selectClasses}
+                      >
+                        {(["REPORTER", "TECHNICIAN", "ADMIN", ...(currentUser.role === "SYSTEM_ADMIN" ? ["SYSTEM_ADMIN"] : [])] as UserRole[]).map((role) => (
+                          <option key={role} value={role}>{formatValue(role)}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge className={managed.isActive ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"}>
+                        {managed.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      {managed.reportedTickets} reported · {managed.assignedTickets} assigned
+                      {managed.hasOpenTickets && <p className="mt-1 max-w-56 text-xs text-red-700">Resolve or reassign open tickets before changing this account.</p>}
+                    </td>
+                    <td className="px-4 py-3 text-sm">{new Date(managed.createdAt).toLocaleDateString()}</td>
+                    <td className="px-4 py-3">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={managed.id === currentUser.id || systemRestricted || cannotDeactivate}
+                        title={cannotDeactivate ? ticketRestriction : undefined}
+                        onClick={() => void updateUser(managed, { isActive: !managed.isActive })}
+                      >
+                        {managed.isActive ? "Deactivate" : "Activate"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        className="ml-2"
+                        disabled={managed.id === currentUser.id || systemRestricted || deleting || managed.hasOpenTickets}
+                        title={managed.hasOpenTickets ? ticketRestriction : undefined}
+                        onClick={() => {
+                          setDeleteError("");
+                          setDeleteTarget(managed);
+                          setDeleteStep("review");
+                        }}
+                      >
+                        <Trash2 /> Delete
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </ResponsiveTable>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={deleteStep === "review" && Boolean(deleteTarget)} onOpenChange={(next) => !next && closeDeleteDialog()}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Delete user account?</DialogTitle>
+            <DialogDescription>
+              Remove login access for {deleteTarget?.fullName} ({deleteTarget?.email}). Ticket and audit history will be retained.
+              Continue to review permanent deletion.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{deleteError}</p>}
+          <DialogFooter>
+            <Button variant="outline" disabled={deleting} onClick={closeDeleteDialog}>Cancel</Button>
+            <Button variant="destructive" disabled={deleting} onClick={() => setDeleteStep("final")}>Continue</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteStep === "final" && Boolean(deleteTarget)} onOpenChange={(next) => !next && closeDeleteDialog()}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Permanently delete this account?</DialogTitle>
+            <DialogDescription>
+              This cannot be undone. {deleteTarget?.fullName} will lose access immediately. Ticket, comment, and audit history will stay linked to a deleted-account record.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{deleteError}</p>}
+          <DialogFooter>
+            <Button variant="outline" disabled={deleting} onClick={closeDeleteDialog}>Cancel</Button>
+            <Button variant="destructive" disabled={deleting} onClick={() => void deleteUser()}>
+              {deleting ? <LoaderCircle className="animate-spin" /> : <Trash2 />}
+              {deleting ? "Deleting..." : "Permanently delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={open} onOpenChange={(next) => !saving && setOpen(next)}>
+        <DialogContent className="sm:max-w-lg">
+          <form onSubmit={createUser}>
+            <DialogHeader>
+              <DialogTitle>Create user account</DialogTitle>
+              <DialogDescription>Provision secure access using an NWU email address.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-5">
+              <Field label="Full name"><Input name="fullName" minLength={2} maxLength={120} required /></Field>
+              <Field label="NWU email"><Input name="email" type="email" placeholder="name@mynwu.ac.za" required /></Field>
+              <Field label="Temporary password">
+                <Input name="password" type="password" minLength={12} required />
+                <p className="text-xs text-muted-foreground">At least 12 characters with uppercase, lowercase and a number.</p>
+              </Field>
+              <Field label="Role">
+                <select name="role" className={selectClasses} defaultValue="REPORTER">
+                  <option value="REPORTER">Reporter</option>
+                  <option value="TECHNICIAN">Technician</option>
+                  <option value="ADMIN">Administrator</option>
+                  {currentUser.role === "SYSTEM_ADMIN" && <option value="SYSTEM_ADMIN">System administrator</option>}
+                </select>
+              </Field>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+              <Button type="submit" className="bg-[#4B2C70] text-white" disabled={saving}>
+                {saving ? <LoaderCircle className="animate-spin" /> : <UserCog />}
+                {saving ? "Creating..." : "Create account"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
 function AuditLog() {
   const [events, setEvents] = useState<AuditEvent[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState("");
   const load = useCallback(async () => { setLoading(true); try { setEvents((await api<{ events: AuditEvent[] }>("/api/admin/audit?limit=250")).events); } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not load audit log"); } finally { setLoading(false); } }, []);
   useEffect(() => { void load(); }, [load]);
-  return <div className="space-y-6"><div className="flex items-center justify-between"><div><h1 className="text-2xl font-semibold tracking-tight">Audit trail</h1><p className="text-sm text-muted-foreground">Permanent, time-stamped records of system and ticket activity.</p></div><Button variant="outline" onClick={() => void load()}><RefreshCw className={loading ? "animate-spin" : ""} /> Refresh</Button></div>{error && <ErrorMessage>{error}</ErrorMessage>}<Card><CardContent className="pt-6">{loading && events.length === 0 ? <LoadingPanel label="Loading audit events" /> : <ResponsiveTable headings={["When","Action","Actor","Ticket","Recorded change"]}>{events.map((event) => <tr key={event.id} className="border-t"><td className="whitespace-nowrap px-4 py-3 text-sm">{new Date(event.createdAt).toLocaleString()}</td><td className="px-4 py-3"><Badge variant="outline">{formatValue(event.action)}</Badge></td><td className="px-4 py-3">{event.actorName ?? "System"}</td><td className="px-4 py-3 font-medium text-[#4B2C70]">{event.ticketNumber ?? "—"}</td><td className="max-w-sm truncate px-4 py-3 text-xs text-muted-foreground" title={JSON.stringify(event.newValues ?? event.previousValues)}>{summariseChange(event.newValues ?? event.previousValues)}</td></tr>)}</ResponsiveTable>}</CardContent></Card></div>;
+  return <div className="space-y-6"><div className="flex items-center justify-between pb-4"><div><h1 className="text-2xl font-semibold tracking-tight">Audit trail</h1></div><Button variant="outline" onClick={() => void load()}><RefreshCw className={loading ? "animate-spin" : ""} /> Refresh</Button></div>{error && <ErrorMessage>{error}</ErrorMessage>}<Card><CardContent className="pt-6">{loading && events.length === 0 ? <LoadingPanel label="Loading audit events" /> : <ResponsiveTable headings={["When","Action","Actor","Ticket","Recorded change"]}>{events.map((event) => <tr key={event.id} className="border-t"><td className="whitespace-nowrap px-4 py-3 text-sm">{new Date(event.createdAt).toLocaleString()}</td><td className="px-4 py-3"><Badge variant="outline">{formatValue(event.action)}</Badge></td><td className="px-4 py-3">{event.actorName ?? "System"}</td><td className="px-4 py-3 font-medium text-[#4B2C70]">{event.ticketNumber ?? "—"}</td><td className="max-w-sm truncate px-4 py-3 text-xs text-muted-foreground" title={JSON.stringify(event.newValues ?? event.previousValues)}>{summariseChange(event.newValues ?? event.previousValues)}</td></tr>)}</ResponsiveTable>}</CardContent></Card></div>;
 }
 
 function SystemAdministration({ role }: { role: UserRole }) {
@@ -365,7 +594,7 @@ function SystemAdministration({ role }: { role: UserRole }) {
   const loadEmail=useCallback(async()=>{if(role!=="SYSTEM_ADMIN")return;setLoadingEmail(true);setEmailError("");try{setEmail(await api("/api/admin/email/status"));}catch(caught){setEmailError(caught instanceof Error?caught.message:"Could not load email status");}finally{setLoadingEmail(false);}},[role]);
   useEffect(()=>{void loadEmail();},[loadEmail]);
   async function testEmail(){setTesting(true);setEmailError("");setEmailMessage("");try{const result=await api<{message:string}>("/api/admin/email/test",{method:"POST"});setEmailMessage(result.message);await loadEmail();}catch(caught){setEmailError(caught instanceof Error?caught.message:"Test email failed");}finally{setTesting(false);}}
-  return <div className="space-y-6"><div><h1 className="text-2xl font-semibold tracking-tight">System administration</h1><p className="text-sm text-muted-foreground">Security, data protection and operational recovery controls.</p></div>{role==="SYSTEM_ADMIN"&&<Card><CardHeader><CardTitle className="flex items-center gap-2"><Mail className="text-[#4B2C70]"/>Email delivery</CardTitle><CardDescription>Gmail SMTP connection and notification-outbox delivery health. Credentials remain server-side.</CardDescription></CardHeader><CardContent className="space-y-4">{loadingEmail&&!email?<LoadingPanel label="Checking SMTP connection"/>:email&&<><div className="flex flex-wrap items-center gap-2"><Badge className={email.connected?"bg-emerald-100 text-emerald-800":email.configured?"bg-red-100 text-red-800":"bg-amber-100 text-amber-900"}>{email.connected?"Connected":email.configured?"Connection failed":"Not configured"}</Badge>{email.host&&<span className="text-sm text-muted-foreground">{email.host}:{email.port} · {email.secure?"TLS":"STARTTLS"}</span>}</div><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><SmallStat label="Pending" value={email.pending}/><SmallStat label="Successfully sent" value={email.sent}/><SmallStat label="Failed" value={email.failed}/><SmallStat label="Retries" value={email.retryCount}/></div>{(email.lastError||email.connectionError)&&<p className="rounded-lg bg-red-50 p-3 text-sm text-red-700"><strong>Last error:</strong> {email.connectionError??email.lastError}</p>}</>} {emailError&&<ErrorMessage>{emailError}</ErrorMessage>}{emailMessage&&<p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700" role="status">{emailMessage}</p>}<div className="flex flex-wrap gap-2"><Button className="bg-[#4B2C70] text-white" disabled={testing||!email?.configured} onClick={()=>void testEmail()}>{testing?<LoaderCircle className="animate-spin"/>:<Mail/>}{testing?"Sending...":"Send test email"}</Button><Button variant="outline" disabled={loadingEmail} onClick={()=>void loadEmail()}><RefreshCw className={loadingEmail?"animate-spin":""}/>Refresh</Button></div></CardContent></Card>}<div className="grid gap-6 md:grid-cols-2"><Card><CardHeader><CardTitle className="flex items-center gap-2"><DatabaseBackup className="text-[#4B2C70]" /> Database backup</CardTitle><CardDescription>Export a password-safe JSON snapshot of operational records for recovery.</CardDescription></CardHeader><CardContent>{role === "SYSTEM_ADMIN" ? <Button className="bg-[#4B2C70] text-white" onClick={() => download("/api/admin/backup")}><Download /> Export backup</Button> : <p className="text-sm text-muted-foreground">Only a system administrator can export backups.</p>}</CardContent></Card><Card><CardHeader><CardTitle className="flex items-center gap-2"><ShieldCheck className="text-[#4B2C70]" /> Security controls</CardTitle></CardHeader><CardContent className="space-y-2 text-sm text-muted-foreground"><p>Cookie-based sessions with revocation and expiry</p><p>Role-based route authorization</p><p>Passwords stored using bcrypt hashes</p><p>Immutable audit records and reporter-hidden notes</p><p>Rate-limited authentication endpoints</p></CardContent></Card></div></div>;
+  return <div className="space-y-6"><div className="pb-4"><h1 className="text-2xl font-semibold tracking-tight">System administration</h1></div>{role==="SYSTEM_ADMIN"&&<Card><CardHeader><CardTitle className="flex items-center gap-2"><Mail className="text-[#4B2C70]"/>Email delivery</CardTitle><CardDescription>Gmail SMTP connection and notification-outbox delivery health. Credentials remain server-side.</CardDescription></CardHeader><CardContent className="space-y-4">{loadingEmail&&!email?<LoadingPanel label="Checking SMTP connection"/>:email&&<><div className="flex flex-wrap items-center gap-2"><Badge className={email.connected?"bg-emerald-100 text-emerald-800":email.configured?"bg-red-100 text-red-800":"bg-amber-100 text-amber-900"}>{email.connected?"Connected":email.configured?"Connection failed":"Not configured"}</Badge>{email.host&&<span className="text-sm text-muted-foreground">{email.host}:{email.port} · {email.secure?"TLS":"STARTTLS"}</span>}</div><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><SmallStat label="Pending" value={email.pending}/><SmallStat label="Successfully sent" value={email.sent}/><SmallStat label="Failed" value={email.failed}/><SmallStat label="Retries" value={email.retryCount}/></div>{(email.lastError||email.connectionError)&&<p className="rounded-lg bg-red-50 p-3 text-sm text-red-700"><strong>Last error:</strong> {email.connectionError??email.lastError}</p>}</>} {emailError&&<ErrorMessage>{emailError}</ErrorMessage>}{emailMessage&&<p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700" role="status">{emailMessage}</p>}<div className="flex flex-wrap gap-2"><Button className="bg-[#4B2C70] text-white" disabled={testing||!email?.configured} onClick={()=>void testEmail()}>{testing?<LoaderCircle className="animate-spin"/>:<Mail/>}{testing?"Sending...":"Send test email"}</Button><Button variant="outline" disabled={loadingEmail} onClick={()=>void loadEmail()}><RefreshCw className={loadingEmail?"animate-spin":""}/>Refresh</Button></div></CardContent></Card>}<div className="grid gap-6 md:grid-cols-2"><Card><CardHeader><CardTitle className="flex items-center gap-2"><DatabaseBackup className="text-[#4B2C70]" /> Database backup</CardTitle><CardDescription>Export a password-safe JSON snapshot of operational records for recovery.</CardDescription></CardHeader><CardContent>{role === "SYSTEM_ADMIN" ? <Button className="bg-[#4B2C70] text-white" onClick={() => download("/api/admin/backup")}><Download /> Export backup</Button> : <p className="text-sm text-muted-foreground">Only a system administrator can export backups.</p>}</CardContent></Card><Card><CardHeader><CardTitle className="flex items-center gap-2"><ShieldCheck className="text-[#4B2C70]" /> Security controls</CardTitle></CardHeader><CardContent className="space-y-2 text-sm text-muted-foreground"><p>Cookie-based sessions with revocation and expiry</p><p>Role-based route authorization</p><p>Passwords stored using bcrypt hashes</p><p>Immutable audit records and reporter-hidden notes</p><p>Rate-limited authentication endpoints</p></CardContent></Card></div></div>;
 }
 
 function Metric({ label, value, icon }: { label: string; value: string | number; icon: ReactNode }) { return <Card><CardContent className="flex items-center justify-between py-1"><div><p className="text-sm text-muted-foreground">{label}</p><p className="mt-1 text-2xl font-semibold">{value}</p></div><div className="rounded-xl bg-purple-50 p-3 text-[#4B2C70]">{icon}</div></CardContent></Card>; }

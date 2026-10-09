@@ -337,15 +337,8 @@ export function JobCardsDashboard({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Technician job cards
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Track linked ticket work and manually captured walk-in jobs. Drag a card to another lane to change its status, or open it for details.
-          </p>
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-4 pb-2">
+        {user.role !== "TECHNICIAN" && <h1 className="text-2xl font-semibold tracking-tight">Technician job cards</h1>}
         <div className="flex items-center gap-3">
           <Badge className={badgePalette.brand}>
             {counts.LIVE + counts.SCHEDULED + counts.PAUSED + counts.ESCALATED} active

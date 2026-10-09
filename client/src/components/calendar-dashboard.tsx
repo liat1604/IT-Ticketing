@@ -88,8 +88,8 @@ export function CalendarDashboard({ userId, role }: { userId: string; role: User
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div><h1 className="text-2xl font-semibold tracking-tight">Service calendar</h1><p className="text-sm text-muted-foreground">Plan SLA targets, site visits, maintenance and follow-ups.</p></div>
+      <div className="flex flex-wrap items-center justify-between gap-4 pb-2">
+        {role !== "TECHNICIAN" && <h1 className="text-2xl font-semibold tracking-tight">Service calendar</h1>}
         <Button className="bg-[#4B2C70] text-white hover:bg-[#3d235d]" onClick={() => { setSelectedEvent(null); setOpen(true); }}><Plus /> Add event</Button>
       </div>
       {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{error}</p>}
