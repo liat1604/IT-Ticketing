@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>CSIS IT Support — A3 poster</title>
+  <style>
+    :root { color-scheme: light; font-family: Arial, Helvetica, sans-serif; }
+    body { margin:0; min-height:100vh; display:grid; place-items:center; background:#d7cedd; }
+    main { width:min(94vw,900px); padding:28px; box-sizing:border-box; }
+    img { display:block; width:100%; height:auto; box-shadow:0 24px 70px #27143f44; }
+    button { margin:18px auto 0; display:block; border:0; border-radius:999px; padding:14px 24px; font-weight:800; color:#fff; background:#e45768; cursor:pointer; }
+    p { text-align:center; color:#4a3a54; font-size:14px; }
+  </style>
+</head>
+<body>
+<main>
+  <img id="poster" src="/promo-poster.svg" alt="A3 CSIS IT Support poster" />
+  <button id="download">Download A3 poster PNG</button>
+  <p>Print-ready A3 portrait artwork. Editable SVG source is included beside the PNG.</p>
+</main>
+<script>
+document.getElementById('download').onclick = async () => {
+  const response = await fetch('/promo-poster.svg');
+  const svg = await response.text();
+  const blob = new Blob([svg], {type:'image/svg+xml'});
+  const url = URL.createObjectURL(blob);
+  const img = new Image();
+  img.onload = () => {
+    const canvas = document.createElement('canvas'); canvas.width = 2480; canvas.height = 3508;
+    canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+    canvas.toBlob((png) => { const link = document.createElement('a'); link.href = URL.createObjectURL(png); link.download = 'csis-it-support-a3-poster.png'; link.click(); setTimeout(() => { URL.revokeObjectURL(url); URL.revokeObjectURL(link.href); }, 1000); }, 'image/png');
+  };
+  img.src = url;
+};
+</script>
+</body>
+</html>
