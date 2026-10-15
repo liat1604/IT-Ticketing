@@ -1,0 +1,1533 @@
+=== PAGE 1 ===
+ Project  Plan©
+  
+IT  Ticket  and  Log  System  Shani  Nezar  &  Lia  Theunissen    2026/05/09  
+ 
+
+
+=== PAGE 2 ===
+  Document  Control   Document  Information  
+ 
+©
+ Information  Document  ID [Document  Management  System  #]  Document  Owner  [Owner  Name]  Issue  Date  [Date]  Last  Saved  Date  [Date]  File  Name  [Name]   Document  History  
+ Version  Issue  Date  Changes  [1.0]  2026/05/22  Added  a  little  info  to  all  sections            Document  Approvals  
+ Role  Name©
+ Signature  Date  Project  Sponsor    
+   
+Project  Review  Group    
+   
+Project  Manager©
+   
+   
+Quality  Manager  [if  applicable]   
+   
+Procurement  Manager  [if  applicable]   
+   
+Communications  Manager  [if  applicable]   
+   
+Project  Office  Manager  [if  applicable]   
+   
+  
+1     
+
+=== PAGE 3 ===
+Table  of  Contents   1  Work  Breakdown  Structure  2 1.1  Generic  Information  Applicable  to  all  Plans  2 1.1.1  Roles  The  project  team  consists  of  the  following  key  roles:  2 1.1.2  Business  Case  Summary  2 1.1.3  Feasibility  Study  Summary  2 1.1.4  Functional  Specification  Summary  2 1.1.5  Technical  Specification  Summary  2 1.2  Scope  Management  3 1.2.1  Scope  Management  Strategy  3 1.3  Work  Breakdown  Structure  3 Phases  3 A
+CTIVITIES
+ 3
+ Tasks  4 Milestones  4 Effort  5 2  Project  Plan  5 Schedule  5 Dependencies  6 Cost  Management  6 Summary  6 2.  ACCEPTANCE  PLAN  6 Acceptance  Criteria  6 Acceptance  Plan  Schedule  7 Acceptance  Process  7 Activities  7 Summary  7 3.  COMMUNICATIONS  PLAN  8  
+2     
+
+=== PAGE 4 ===
+ 1  W ork  Breakdown  Structure  
+1.1  Generic  Information  Applicable  to  all  Plans  
+1.1.1  Roles  The  project  team  consists  of  the  following  key  roles:  
+●  Project  Manager  /  Lead  Developer:  Responsible  for  sprint  management,  
+architecture
+ 
+oversight,
+ 
+and
+ 
+API
+ 
+development.
+ ●  Frontend  Developers:  Two  student  developers  tasked  with  UI/UX  design  and  
+building
+ 
+React
+ 
+dashboards.
+ ●  CSIS  Network  Admin:  Responsible  for  server  provisioning  and  SMTP  port  
+whitelisting.
+ ●  CSIS  IT  Supervisor  (Project  Sponsor):  Evaluates  UAT,  provides  final  sign-off,  and  
+unblocks
+ 
+infrastructure
+ 
+requests.
+ 
+1.1.2  Business  Case  Summary   
+The  existing  IT  support  process  in  the  CSIS  environment  uses  a  manual,  email-oriented  
+model
+ 
+that
+ 
+lacks
+ 
+structure,
+ 
+traceability,
+ 
+and
+ 
+efficiency.
+ 
+This
+ 
+causes
+ 
+missed
+ 
+requests,
+ 
+disjointed
+ 
+communication,
+ 
+and
+ 
+an
+ 
+inability
+ 
+to
+ 
+measure
+ 
+performance.
+ 
+This
+ 
+project
+ 
+proposes
+ 
+a
+ 
+custom
+ 
+Integrated
+ 
+IT
+ 
+Ticketing
+ 
+and
+ 
+Log
+ 
+System
+ 
+to
+ 
+centralize
+ 
+all
+ 
+IT
+ 
+requests.
+ 
+The
+ 
+core
+ 
+capabilities
+ 
+include
+ 
+structured
+ 
+ticket
+ 
+logging,
+ 
+real-time
+ 
+ticket-based
+ 
+communication,
+ 
+job
+ 
+cards
+ 
+with
+ 
+time
+ 
+tracking,
+ 
+and
+ 
+reporting.
+ 
+1.1.3  Feasibility  Study  Summary   
+Three  potential  solutions  were  evaluated:  a  custom  web-based  application,  a  Commercial  
+Off-The-Shelf
+ 
+(COTS)
+ 
+system,
+ 
+and
+ 
+an
+ 
+Open-Source
+ 
+ticketing
+ 
+system.
+ 
+The
+ 
+Custom
+ 
+Web-Based
+ 
+Application
+ 
+(MERN
+ 
+Stack)
+ 
+ranked
+ 
+highest
+ 
+(4.6/10).
+ 
+It
+ 
+utilizes
+ 
+internal
+ 
+student
+ 
+developers
+ 
+to
+ 
+ensure
+ 
+zero
+ 
+licensing
+ 
+costs,
+ 
+provides
+ 
+high
+ 
+customization
+ 
+for
+ 
+specific
+ 
+workflows
+ 
+(like
+ 
+mobile
+ 
+accessibility
+ 
+and
+ 
+job
+ 
+card
+ 
+time
+ 
+tracking),
+ 
+and
+ 
+eliminates
+ 
+the
+ 
+technical
+ 
+constraints
+ 
+of
+ 
+modifying
+ 
+pre-built
+ 
+open-source
+ 
+platforms.
+ 
+1.1.4  Functional  Specification  Summary  
+The  system  will  be  a  responsive,  web-based  application  meeting  WCAG  2.1  accessibility  
+standards.
+ 
+Core
+ 
+functionalities
+ 
+include
+ 
+a
+ 
+Student/Staff
+ 
+Portal
+ 
+for
+ 
+logging
+ 
+tickets,
+ 
+a
+ 
+Technician
+ 
+Dashboard
+ 
+featuring
+ 
+start/stop
+ 
+"job
+ 
+card"
+ 
+timers,
+ 
+and
+ 
+an
+ 
+Admin
+ 
+&
+ 
+Reporting
+ 
+Dashboard
+ 
+for
+ 
+tracking
+ 
+workload
+ 
+trends
+ 
+and
+ 
+turnaround
+ 
+times.
+ 
+1.1.5  Technical  Specification  Summary   
+The  application  will  be  developed  using  the  MERN  stack  (MongoDB,  Express.js,  React.js,  
+Node.js).
+ 
+The
+ 
+system
+ 
+will
+ 
+rely
+ 
+on
+ 
+localized
+ 
+MongoDB
+ 
+hosting
+ 
+to
+ 
+ensure
+ 
+POPIA
+ 
+compliance
+ 
+and
+ 
+will
+ 
+integrate
+ 
+directly
+ 
+with
+ 
+the
+ 
+NWU
+ 
+SMTP
+ 
+Mail
+ 
+Relay
+ 
+for
+ 
+automated
+ 
+notifications.
+ 
+●  Assumptions:  Student  developers  have  consistent  weekly  hours  to  dedicate,  and  
+the
+ 
+NWU
+ 
+email
+ 
+infrastructure
+ 
+is
+ 
+reliable.
+ ●  Constraints:  Strict  zero-budget  limit  using  internal  resources,  and  an  8-week  
+timeframe
+ 
+confined
+ 
+to
+ 
+the
+ 
+second
+ 
+semester.
+ 2     
+
+=== PAGE 5 ===
+ 
+1.2  Scope  Management  
+The  project  scope  includes  delivering  a  web-based  portal  for  students/staff,  a  technician  
+dashboard
+ 
+with
+ 
+start/stop
+ 
+time
+ 
+tracking,
+ 
+and
+ 
+automated
+ 
+SMTP
+ 
+email
+ 
+notifications.
+ 
+1.2.1  Scope  Management  Strategy   
+Scope  will  be  managed  by  utilizing  a  Sprint  Backlog  and  Kanban  Board  to  track  daily  tasks,  
+feature
+ 
+requests,
+ 
+and
+ 
+explicitly
+ 
+monitor
+ 
+for
+ 
+scope
+ 
+creep.
+ 
+Any
+ 
+feature
+ 
+request
+ 
+outside
+ 
+the
+ 
+baseline
+ 
+specs
+ 
+will
+ 
+be
+ 
+systematically
+ 
+flagged
+ 
+and
+ 
+denied
+ 
+if
+ 
+it
+ 
+requires
+ 
+paid
+ 
+APIs.
+ 
+1.3  Work  Breakdown  Structure   
+Phases   Phase  Title  Phase  Description  Phase  Sequence  
+Initiation  Defining  the  project  scope,  objectives,  and  securing  formal  approval  of  the  Business  Case  and  Feasibility  Study.   
+1  
+Planning   Developing  the  Functional  Specifications,  technical  architecture  (MERN  stack),  UI  wireframes,  and  all  supporting  PM  plans.   
+2  
+3     
+
+
+=== PAGE 6 ===
+Execution  The  core  agile  development  phase  (sprints)  encompassing  backend  database  creation,  frontend  UI  development,  and  system  integrations.   
+3  
+Closing   Final  User  Acceptance  Testing  (UAT),  deployment  to  the  live  CSIS  server,  and  handover  of  maintenance  documentation.   
+4  
+ 
+Activities   Phase  Title  Activity  Title  Activity  Description  Activity  Sequence  
+Initiation  Project  Definition  
+Clarify  the  core  problem  (manual  emails)  and  define  the  scope  of  the  solution  (web-based  ticketing).  
+1.1  
+Planning  System  Design  
+Blueprint  the  MERN  architecture,  design  the  MongoDB  schema,  and  create  wireframes  for  the  Student/Admin  dashboards.  
+2.1  
+Execution  Backend  Development  
+Configure  the  Node.js  server  and  build  the  RESTful  APIs  for  tickets,  users,  and  comments.  
+3.1  
+Frontend  Development  
+Build  the  React.js  user  interfaces,  including  the  "Job  Card"  timer  module  for  technicians.  
+3.2  
+Systems  Integration  
+Connect  the  backend  APIs  to  the  NWU  SMTP  relay  for  automated  email  triggers.  
+3.3  
+Closing  Deployment  &  Handover  
+Push  the  codebase  to  the  CSIS  production  server  and  deliver  technical  manuals  to  IT  staff.  
+4.1  
+ Tasks   Activity  Title  Task  Title  Task  Description  Task  Sequence  
+System  Design  Design  Database  Schema  
+Map  out  the  ERD  for  Users,  Tickets,  Comments,  and  Time  Logs.  
+2.1.1  
+System  Design  UI/UX  Wireframing  
+Design  mobile-friendly  mockups  for  the  technician  job  cards.  
+2.1.2  
+4     
+
+=== PAGE 7 ===
+Backend  Dev   
+Setup  Server  Environment  
+Initialize  Node.js  and  connect  to  the  MongoDB  instance.  
+3.1.1  
+Build  Auth  &  Ticket  APIs  
+Program  the  logic  for  logging  tickets  and  role-based  access  routing.  
+3.1.2  
+Frontend  Dev   
+Build  User  Portal  Develop  the  React  form  for  students  to  submit  IT  requests.  
+3.2.1  
+Build  Admin  Dashboard  
+Develop  the  visual  reporting  tools  for  turnaround  times.  
+3.2.2  
+Integration  SMTP  Configuration  
+Code  the  trigger  functions  to  send  emails  via  NWU  servers.  
+3.3.1  
+Deployment  UAT  Execution  Conduct  live  testing  with  a  sample  group  of  CSIS  technicians.  
+4.1.1  
+ 
+ 
+Milestones  
+ Milestone  Title  Milestone  Description  Milestone  Date  
+M1:  Planning  Sign-off  
+Formal  approval  of  the  Functional  Specifications  and  System  Architecture.  
+End  of  Semester  1  
+M2:  Backend  API  Complete  
+The  database  and  all  core  logic  routes  are  fully  functional  and  tested.  
+Week  3,  Semester  2  
+M3:  Frontend  Complete  
+React  UIs  are  fully  built  and  communicate  with  the  backend  APIs.  
+Week  6,  Semester  2  
+5     
+
+
+=== PAGE 8 ===
+M4:  System  Go-Live  Successful  deployment,  UAT  sign-off,  and  handover  to  CSIS  IT  staff.  
+Week  8,  Semester  2  
+Effort   Task  Title  Resource  Effort  
+Design  Database  Schema  Lead  Developer  10  Hours  
+UI/UX  Wireframing  UI  Designer  (Student)  15  Hours  
+Setup  Server  Environment  Backend  Developer  /  CSIS  Admin  8  Hours  
+Build  Auth  &  Ticket  APIs  Backend  Developer  30  Hours  
+Build  User  Portal  &  Dashboards  Frontend  Developer  40  Hours  
+SMTP  Configuration  Lead  Developer  /  CSIS  Admin  12  Hours  
+UAT  Execution  Whole  Team  +  CSIS  IT  Supervisor  10  Hours  
+  
+2  Project  Plan  
+Schedule   Planning  and  documentation  occur  in  Semester  1.  Development  is  strictly  confined  to  an  
+8-week
+ 
+sprint
+ 
+cycle
+ 
+in
+ 
+Semester
+ 
+2,
+ 
+culminating
+ 
+in
+ 
+the
+ 
+M4
+ 
+System
+ 
+Go-Live
+ 
+in
+ 
+Week
+ 
+8.
+ 
+  
+ 
+Dependencies   Activity  Title  Depends  on  Dependency  Type  
+Backend  Development  System  Design  (Database  Schema)  Finish-to-Start  (FS)  
+6     
+
+
+=== PAGE 9 ===
+Frontend  Development  Backend  Development  (APIs)  Finish-to-Start  (FS)  
+Systems  Integration  (SMTP)  
+CSIS/NWU  IT  Granting  Port  Access  Finish-to-Start  (FS)  
+Deployment  &  Handover  Systems  Integration  Finish-to-Start  (FS)   
+Cost  Management   This  is  a  strict  zero-budget  project  utilizing  internal  student  resources  and  open-source  tools.  
+Because
+ 
+the
+ 
+project
+ 
+operates
+ 
+on
+ 
+this
+ 
+constraint,
+ 
+financial
+ 
+monitoring
+ 
+focuses
+ 
+on
+ 
+preventing
+ 
+scope
+ 
+creep
+ 
+to
+ 
+avoid
+ 
+unauthorized
+ 
+features
+ 
+that
+ 
+require
+ 
+paid
+ 
+plugins.
+ 
+  
+Summary   The  Work  Breakdown  Structure  systematically  divides  the  CSIS  IT  Ticket  system  into  4  
+distinct
+ 
+phases
+ 
+(Initiation,
+ 
+Planning,
+ 
+Execution,
+ 
+Closing)
+ 
+spread
+ 
+across
+ 
+two
+ 
+semesters.
+ 
+The
+ 
+zero-budget
+ 
+approach
+ 
+relies
+ 
+entirely
+ 
+on
+ 
+internal
+ 
+student
+ 
+developer
+ 
+effort
+ 
+and
+ 
+institutional
+ 
+resources.
+ 
+  
+2.  ACCEPTANCE  PLAN   
+Acceptance  Criteria    Milestone  Name  Acceptance  Criteria  Acceptance  Standards  
+M1:  Planning  Sign-off  
+Documentation  is  comprehensive,  POPIA  compliant,  and  viable  for  a  zero-budget  internal  build.  
+100%  adherence  to  NWU  formatting  standards.  Signed  off  by  CSIS  Supervisor.  
+M2:  Backend  Complete  
+APIs  successfully  create,  update,  and  retrieve  ticket  records  and  time  logs.  
+100%  pass  rate  on  automated  API  unit  tests.  Zero  critical  security  vulnerabilities.  
+M3:  Frontend  Complete  
+UI  is  responsive  across  desktop  and  mobile  devices.  Job  card  timers  function  accurately.  
+Interfaces  meet  WCAG  2.1  accessibility  standards.  UI  pages  load  within  2.0  seconds.  
+M4:  System  Go-Live  
+End-to-end  system  allows  users  to  log  tickets  and  triggers  automated  email  notifications  via  NWU  SMTP.  
+Successful  UAT  sign-off  by  a  sample  group  of  students  and  technicians.  
+ 
+7     
+
+=== PAGE 10 ===
+Acceptance  Plan  Schedule   
+Milestone  
+Deliverables  Review  Method  Reviewers  Date  
+M1  FS  Document,  PM  Plans  &  Wireframes  
+Presentation  &  Review  
+CSIS  IT  Supervisor  End  S1  
+M2  Node.js  APIs  &  MongoDB  Database  
+Code  Review  Lead  Developer  &  Supervisor  
+Wk3,  S2  
+M3  React  Dashboards  &  Job  Card  UI  
+Live  System  Demo  
+CSIS  IT  Staff  &  Supervisor  
+Wk6,  S2  
+M4  Fully  Integrated  Live  System  
+Formal  UAT  Session  
+Sample  Users  &  Supervisor  
+Wk8,  S2  
+Acceptance  Process   
+The  acceptance  process  follows  an  iterative  approach  aligned  with  agile  sprints.  Deliverables  
+are
+ 
+verified
+ 
+internally
+ 
+by
+ 
+the
+ 
+development
+ 
+team
+ 
+through
+ 
+peer
+ 
+reviews
+ 
+and
+ 
+unit
+ 
+testing
+ 
+before
+ 
+being
+ 
+presented
+ 
+to
+ 
+the
+ 
+project
+ 
+sponsor
+ 
+(CSIS
+ 
+IT
+ 
+Supervisor)
+ 
+for
+ 
+formal
+ 
+acceptance.
+ 
+Final
+ 
+system
+ 
+acceptance
+ 
+relies
+ 
+on
+ 
+a
+ 
+structured
+ 
+User
+ 
+Acceptance
+ 
+Testing
+ 
+(UAT)
+ 
+phase.
+ 
+ 
+Activities  
+●  Peer  Code  Reviews:  Internal  review  of  codebase  against  performance  and  security  
+standards.
+ ●  Sprint  Demos:  Bi-weekly  live  demonstrations  of  completed  system  features.  ●  User  Acceptance  Testing  (UAT):  Providing  a  controlled  sandbox  environment  for  real  
+users.
+ ●  Defect  Triage:  Logging  and  resolving  any  bugs  identified  prior  to  final  sign-off.  
+Summary  
+Acceptance  relies  heavily  on  early  peer  review  and  a  final  formal  UAT  sandbox  session.  This  
+guarantees
+ 
+that
+ 
+all
+ 
+workflows—from
+ 
+logging
+ 
+tickets
+ 
+to
+ 
+tracking
+ 
+job
+ 
+card
+ 
+time—meet
+ 
+both
+ 
+quality
+ 
+standards
+ 
+and
+ 
+end-user
+ 
+needs
+ 
+before
+ 
+deployment.
+ 
+ 
+ 
+8     
+
+=== PAGE 11 ===
+3.  CO MMUNICATIO NS  PLAN    
+3.1  Communications  Requirements  
+3.1.1  Stakeholder  List  
+●  CSIS  IT  Supervisor  (Project  Sponsor)  ●  Student  Development  Team  (Project  Team  /  Developers)  ●  CSIS  Technicians  (Primary  Users)  ●  Students  &  Staff  (End  Users)  
+3.1.2  Stakeholder  Requirements  
+●  Sponsor:  Requires  bi-weekly  sprint  progress,  risk  escalation,  UAT  results,  and  final  
+sign-off.
+ ●  Dev  Team:  Requires  daily/weekly  task  allocations,  code  review  feedback,  and  
+technical
+ 
+blockers.
+ ●  Technicians:  Require  updates  on  "Job  Card"  functionality,  UI/UX  testing  feedback,  
+and
+ 
+UAT
+ 
+scheduling.
+ ●  End  Users:  Require  Go-Live  announcements  and  user  manuals.  
+3.1.3  Communications  Activities  
+Activity  ID  
+Information  Stakeholders  Timeframes  Methods  
+C01  Stand-up  Updates  &  Task  Sync  
+Project  Team  Weekly  In-person  /  WhatsApp  Group  
+C02  Sprint  Review  &  Live  Demo  
+Project  Sponsor  &  Team  
+Bi-weekly  Formal  Meeting  (Face-to-Face)  
+C03  Technical  Updates  &  Versioning  
+Project  Team  Continuous  GitHub  Commits  /  Pull  Requests  
+C04  Formal  Phase  Sign-off  
+Project  Sponsor  
+End  of  phases  
+Phase  Review  Document  via  Email  
+C05  System  Go-Live  Announcement  
+All  End  Users  Wk  8,  Sem  2  Mass  Broadcast  Email   
+3.1.4  Assumptions  and  Constraints  
+●  Assumptions:  Project  Sponsor  will  be  consistently  available  for  bi-weekly  Sprint  
+Reviews.
+ 9     
+
+=== PAGE 12 ===
+●  Constraints:  All  communication  tools  must  be  free  or  currently  licensed  by  the  
+university
+ 
+(e.g.,
+ 
+WhatsApp,
+ 
+GitHub,
+ 
+NWU
+ 
+Webmail).
+ 
+3.2  Communications  Process  
+Communication  is  tightly  integrated  into  the  agile  workflow.  Internal  coordination  occurs  via  
+weekly
+ 
+stand-ups
+ 
+and
+ 
+GitHub,
+ 
+while
+ 
+sponsor
+ 
+updates
+ 
+are
+ 
+delivered
+ 
+face-to-face
+ 
+during
+ 
+sprint
+ 
+demos.
+ 
+3.2.1  Activities  
+●  Conducting  weekly  internal  team  stand-ups  to  track  sprint  progress.  ●  Preparing  and  delivering  bi-weekly  progress  demonstrations  to  the  CSIS  IT  
+Supervisor.
+ ●  Managing  the  GitHub  repository  for  technical  communication  and  code  reviews.  
+3.3  Summary  
+Clear  communication  lines  are  maintained  to  guarantee  transparency  and  rapid  unblocking  
+of
+ 
+technical
+ 
+issues,
+ 
+ensuring
+ 
+the
+ 
+8-week
+ 
+execution
+ 
+sprint
+ 
+remains
+ 
+on
+ 
+track.
+ 
+4.  FINANCIAL  PLAN  
+4.1  Financial  Expenses  
+4.1.1  Labour  
+ Role  Unit  Cost  
+Project  Manager  /  Lead  Developer  (Student)  R  0.00  
+Frontend  /  Backend  Developers  (Students)  R  0.00  
+CSIS  IT  Supervisor  (Project  Sponsor)  R  0.00  
+CSIS  Network  Administrator  R  0.00  
+4.1.2  Other  
+●  Equipment:  Development  Laptops,  CSIS  On-Premise  Server,  NWU  SMTP  Relay  =  R  
+0.00.
+ ●  Materials:  MERN  Stack  Frameworks,  MongoDB,  GitHub  =  R  0.00.  ●  Suppliers  /  Admin:  N/A  =  R  0.00.  
+4.2  Schedule  No  capital  expenditure  will  be  incurred  in  any  month.  Total  budget  required:  R  0.00.  
+10     
+
+=== PAGE 13 ===
+4.3  Financial  Process  Because  the  project  operates  on  a  strict  zero-budget  constraint,  financial  monitoring  focuses  
+primarily
+ 
+on
+ 
+preventing
+ 
+scope
+ 
+creep.
+ ●  Activities:  Evaluating  sprint  backlogs  during  bi-weekly  reviews  to  ensure  no  
+unauthorized
+ 
+features
+ 
+are
+ 
+being
+ 
+built;
+ 
+Architecture
+ 
+audits
+ 
+to
+ 
+confirm
+ 
+only
+ 
+open-source
+ 
+or
+ 
+free-tier
+ 
+dependencies
+ 
+are
+ 
+integrated.
+ ●  Roles:  The  Project  Manager  monitors  technical  decisions.  The  Project  Sponsor  denies  
+any
+ 
+requests
+ 
+falling
+ 
+outside
+ 
+the
+ 
+approved
+ 
+zero-budget
+ 
+scope.
+ 
+4.4  Summary  The  project  is  entirely  self-funded  via  existing  university  infrastructure  and  student  labor,  
+ensuring
+ 
+the
+ 
+highest
+ 
+possible
+ 
+return
+ 
+on
+ 
+investment
+ 
+by
+ 
+carrying
+ 
+zero
+ 
+direct
+ 
+financial
+ 
+costs.
+  
+5.  Procurement  Plan  
+5.1  Procurement  Requirements    Item  Description  Justification  Budget  
+Virtual  Machine  (VM)  
+Dedicated  server  space  on  CSIS  network.  
+To  host  backend  and  frontend  securely  on  campus.  
+R  0.00  
+MongoDB  Localized  database  storage.  
+To  store  tickets  and  maintain  POPIA  compliance.  
+R  0.00  
+SMTP  Access  Whitelisted  IP  access  to  NWU  mail  relay.  
+To  send  automated  status  emails.  
+R  0.00  
+5.2  Procurement  Process  The  procurement  strategy  is  fully  internal.  
+●  The  Project  Manager  drafts  technical  specifications  (RAM,  Node.js  runtime)  and  logs  
+a
+ 
+formal
+ 
+IT
+ 
+Service
+ 
+Desk
+ 
+request
+ 
+with
+ 
+NWU/CSIS
+ 
+IT
+ 
+administrators.
+ ●  The  CSIS  IT  Supervisor  (Sponsor)  approves  the  request.  ●  The  Lead  Developer  receives  the  server  IP  and  credentials,  and  runs  a  test  
+deployment
+ 
+to
+ 
+ensure
+ 
+ports
+ 
+are
+ 
+open.
+ 
+6.  QUALITY  PLAN  
+6.1  Quality  Targets  
+●  Structured  Ticket  Logging:  Users  must  be  able  to  log  a  ticket  in  under  60  seconds  
+(WCAG
+ 
+2.1
+ 
+standards).
+ ●  Technician  Time  Tracking:  System  calculations  must  be  100%  accurate,  capturing  
+timestamps
+ 
+down
+ 
+to
+ 
+the
+ 
+second
+ 
+in
+ 
+the
+ 
+MongoDB
+ 
+database.
+ ●  Automated  Communications:  100%  delivery  success  rate  for  automated  emails  within  
+2
+ 
+minutes
+ 
+of
+ 
+a
+ 
+status
+ 
+trigger.
+ 
+11     
+
+=== PAGE 14 ===
+●  Secure  Data  Handling:  Strict  adherence  to  POPIA  with  zero  critical  vulnerabilities  
+during
+ 
+security
+ 
+audits.
+ 
+6.2  Quality  Assurance  Plan   Technique  Description  Frequency  
+Peer  Code  Reviews  
+Custom  code  reviewed  via  GitHub  Pull  Requests  before  merging.  
+Weekly  
+UI/UX  Audits  Reviewing  Figma  wireframes  against  NWU  branding  and  responsiveness.  
+End  of  Planning  
+Security  Review  Evaluating  database  schema  for  POPIA  compliance  and  RBAC.  
+Bi-weekly  
+6.3  Quality  Control  Plan   Technique  Description  Frequency  
+Automated  Unit  Testing  Testing  API  endpoints  using  Postman  or  Jest.  
+Continuous  
+Performance  Load  Testing  Simulating  up  to  100  users  to  ensure  sub-2.0  second  responses.  
+Pre-Deployment  
+User  Acceptance  Testing  (UAT)  
+Sandbox  environment  for  students  and  techs  to  test  workflows.  
+Week  8  
+ 
+6.4  Quality  Process    
+Quality  is  managed  iteratively  alongside  Agile  sprint  cycles.  
+6.4.1  Activities  
+●  Conducting  weekly  peer  code  reviews  on  GitHub.  ●  Writing  and  executing  automated  API  test  scripts  to  verify  backend  logic.  ●  Logging  and  triaging  software  bugs  (defects)  into  a  centralized  tracking  board.  ●  Facilitating  a  formal  User  Acceptance  Testing  (UAT)  session.  
+6.5  Summary  
+Proactive  assurance  (Code  Reviews)  prevents  poor  quality  code  from  entering  the  system,  
+while
+ 
+reactive
+ 
+control
+ 
+(Unit
+ 
+Testing,
+ 
+UAT)
+ 
+verifies
+ 
+that
+ 
+the
+ 
+completed
+ 
+software
+ 
+meets
+ 
+the
+ 
+sponsor's
+ 
+specifications.
+ 
+12     
+
+=== PAGE 15 ===
+7.  RESO URCE  PLAN  
+7.1  Resource  Listing  
+Labor:  
+●  Lead  Developer  (1):  Agile  PM,  Node.js,  Express.js  (01  Aug  –  30  Nov).  ●  Frontend  Devs  (2):  React.js,  UI/UX,  CSS  (15  Aug  –  15  Nov).  ●  CSIS  Network  Admin  (1):  Server  Administration,  Networking  (01  Aug  –  30  Nov).  ●  Project  Sponsor  (1):  IT  Management,  Leadership  (01  Aug  –  30  Nov).  
+Equipment  
+●  Development  Laptops  (3):  Min  8GB  RAM,  VS  Code  installed.  ●  CSIS  Internal  Server  (1):  Dedicated  Virtual  Machine  (VM)  running  Linux.  ●  NWU  SMTP  Relay  (1):  Institutional  Mail  Server  Access.  
+Materials  
+●  MERN  Stack  Frameworks:  React,  Node,  Express.  ●  Database:  MongoDB  Instance.  ●  Version  Control:  GitHub  Repository.  
+7.2  Resource  Schedule  
+No  monetary  costs  are  associated  with  any  resources,  as  all  labor  is  provided  by  students  
+and
+ 
+staff,
+ 
+and
+ 
+all
+ 
+equipment/materials
+ 
+are
+ 
+open-source
+ 
+or
+ 
+already
+ 
+owned
+ 
+by
+ 
+the
+ 
+university.
+ 
+7.3  Summary  
+Resource  allocation  relies  entirely  on  the  successful  coordination  of  internal  human  resources  
+and
+ 
+the
+ 
+leveraging
+ 
+of
+ 
+the
+ 
+university's
+ 
+pre-existing
+ 
+network
+ 
+infrastructure.
+ 
+8.  RISK  PLAN  
+8.1  Risk  Management  Approach    Risk  Description  Risk  Impact  
+Actions  Required  to  Mitigate  Risk  
+Data  loss  due  to  system  failure  
+High  Implement  daily  automated  backups  of  the  ticket  database  with  restore  capabilities.  
+Development  Time  Allocation  
+High  Establish  a  rigorous  project  timetable  setting  aside  specific  weekly  development  time.  
+13     
+
+=== PAGE 16 ===
+NWU  IT  Escalation  Workflow  
+Medium  Set  up  a  meeting  to  decide  how  data  should  be  formatted  when  escalated  to  central  IT.  
+User  Adoption  /  Resistance  
+Medium  Create  a  clear  user  guide  and  implement  an  automatic  email  reply  directing  users  to  the  new  portal.  
+Post-project  maintenance  
+High  Implement  a  user  guide  and  handover  documentation  so  future  users  can  maintain  the  application.   
+9.  CO NCLUSIO N  
+The  CSIS  IT  Ticket  and  Log  System  is  designed  to  solve  the  critical  inefficiencies  caused  by  
+manual,
+ 
+email-based
+ 
+IT
+ 
+requests.
+ 
+By
+ 
+leveraging
+ 
+the
+ 
+MERN
+ 
+stack
+ 
+through
+ 
+internal
+ 
+student
+ 
+developers,
+ 
+this
+ 
+project
+ 
+delivers
+ 
+a
+ 
+customized,
+ 
+zero-budget
+ 
+solution.
+ 
+Through
+ 
+stringent
+ 
+agile
+ 
+sprints,
+ 
+rigorous
+ 
+peer
+ 
+reviews,
+ 
+and
+ 
+comprehensive
+ 
+user
+ 
+testing,
+ 
+the
+ 
+system
+ 
+will
+ 
+provide
+ 
+structured
+ 
+ticket
+ 
+tracking,
+ 
+automated
+ 
+communications,
+ 
+and
+ 
+crucial
+ 
+"Job
+ 
+Card"
+ 
+time
+ 
+management
+ 
+for
+ 
+technicians.
+ 
+10.  REFERENCES  
+●  N/A  (All  system  specifications  and  data  derived  from  internal  CSIS  feasibility  studies  
+and
+ 
+business
+ 
+cases).
+ 
+ 
+14     
+
+=== PAGE 17 ===
+ 
+Assumption ●  Resource  Availability:  It  is  assumed  that  the  student  developers  will  have  consistent  weekly  hours  to  
+dedicate
+ 
+to
+ 
+the
+ 
+project
+ 
+alongside
+ 
+their
+ 
+academic
+ 
+coursework.
+ ●  Infrastructure  Reliability:  It  is  assumed  that  the  existing  NWU  email  infrastructure  is  reliable  and  
+capable
+ 
+of
+ 
+handling
+ 
+the
+ 
+automated
+ 
+system
+ 
+notifications
+ 
+without
+ 
+triggering
+ 
+spam
+ 
+filters.
+ ●  User  Competency:  It  is  assumed  that  staff  and  students  possess  basic  digital  literacy  and  will  adapt  
+easily
+ 
+to
+ 
+a
+ 
+standard
+ 
+web
+ 
+form
+ 
+for
+ 
+IT
+ 
+requests.
+ 
+Constraints ●  Zero  Budget  Limit:  Development  is  strictly  restricted  to  internal  student  resources  using  open-source  
+tools
+ 
+to
+ 
+ensure
+ 
+zero
+ 
+licensing
+ 
+costs.
+ ●  Time  Restrictions:  The  system  must  be  developed  and  operational  within  the  strict  confines  of  the  
+second
+ 
+academic
+ 
+semester.
+ ●  Regulatory  Compliance:  The  solution  must  adhere  strictly  to  the  Protection  of  Personal  Information  
+Act
+ 
+(POPIA)
+ 
+regarding
+ 
+the
+ 
+secure
+ 
+handling
+ 
+of
+ 
+student/staff
+ 
+data.
+    
+15     

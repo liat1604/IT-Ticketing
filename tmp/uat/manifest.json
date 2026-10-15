@@ -1,0 +1,592 @@
+{
+  "output": "C:\\Users\\CSIS_PostGrad\\Documents\\GitHub\\IT-Ticketing\\output\\pdf\\CSIS_IT_Ticket_Log_System_UAT_Form.pdf",
+  "pages": [
+    "User Acceptance Testing Form",
+    "Test preparation and source references",
+    "Acceptance baseline decisions",
+    "Acceptance baseline decisions",
+    "Criteria 1 Functional requirements",
+    "Criteria 1 Functional requirements",
+    "Criteria 1 Functional requirements",
+    "Criteria 1 Functional requirements",
+    "Criteria 1 Functional requirements",
+    "Criteria 1 Functional requirements",
+    "Criteria 2 Technical and nonfunctional requirements",
+    "Criteria 2 Technical and nonfunctional requirements",
+    "Criteria 2 Technical and nonfunctional requirements",
+    "Criteria 2 Technical and nonfunctional requirements",
+    "Criteria 2 Technical and nonfunctional requirements",
+    "Criteria 2 Technical and nonfunctional requirements",
+    "Criteria 2 Technical and nonfunctional requirements",
+    "Criteria 2 Technical and nonfunctional requirements",
+    "Criteria 2 Technical and nonfunctional requirements",
+    "Supporting project plan acceptance checks",
+    "Supporting project plan acceptance checks",
+    "Optional and future requirements",
+    "Acceptance results",
+    "Remedial action and retest record",
+    "Customer approval"
+  ],
+  "field_count": 278,
+  "counts": {
+    "F": 28,
+    "T": 41,
+    "P": 6,
+    "O": 4
+  },
+  "cases": [
+    {
+      "title": "Login and role routing",
+      "source": "FS pp. 6, 10-11, Authentication; TS pp. 11, 24; D01",
+      "steps": "Log in as Student/Staff, Technician and Admin; repeat with invalid credentials.",
+      "expected": "Valid users reach the correct role dashboard using a secure session; invalid login shows a clear error. Student entry follows approved D01.",
+      "id": "UAT-F01"
+    },
+    {
+      "title": "Profile and role administration",
+      "source": "FS pp. 6-7, 9; TS p. 9, User Overview",
+      "steps": "Review a user profile and exercise authorized user and role management; repeat as an ordinary user.",
+      "expected": "Names, NWU email and assigned roles persist correctly; only authorized administrators can change permissions.",
+      "id": "UAT-F02"
+    },
+    {
+      "title": "Structured fault submission",
+      "source": "FS p. 11, Ticket Logging; TS pp. 13-14, FR1.1",
+      "steps": "Submit title, detailed description, category, location, lab station ID and urgency from the portal.",
+      "expected": "The form captures all required fault details, uses predefined categories and urgency selections, and confirms a successful submission.",
+      "id": "UAT-F03"
+    },
+    {
+      "title": "Required fields and email validation",
+      "source": "FS pp. 11, 13, Error Prevention; TS p. 18, 3.5.3",
+      "steps": "Omit each mandatory field, enter invalid field values and an invalid NWU email, then correct them.",
+      "expected": "Clear validation prevents incomplete or invalid tickets; corrected input is accepted. Record the approved institutional email domains.",
+      "id": "UAT-F04"
+    },
+    {
+      "title": "Unique identity and ticket persistence",
+      "source": "FS pp. 7, 11; TS p. 14, FR1.3",
+      "steps": "Create multiple tickets, reload them and inspect their saved records with an authorized tester.",
+      "expected": "Each ticket has a unique Ticket ID, creation time, correct reporter association and initial state; all fields persist in MongoDB. See D04.",
+      "id": "UAT-F05"
+    },
+    {
+      "title": "Urgency and queue ordering",
+      "source": "FS pp. 6, 11; TS p. 14, FR1.2",
+      "steps": "Create Low, Medium and High urgency tickets and inspect the technician queue.",
+      "expected": "Priority is saved accurately and organizes the queue so higher urgency work is visible first; hazardous priority is tested separately in T cases.",
+      "id": "UAT-F06"
+    },
+    {
+      "title": "Reporter ticket visibility",
+      "source": "FS pp. 6, 9, 13; TS pp. 17-18, 24",
+      "steps": "As two different reporters, view recent requests, open a ticket and track its status; try the other reporter ticket.",
+      "expected": "Each reporter sees their own requests and status history; another reporter ticket is inaccessible through both UI and API.",
+      "id": "UAT-F07"
+    },
+    {
+      "title": "Technician queue and filters",
+      "source": "FS pp. 9-10; TS p. 14, FR2.1",
+      "steps": "Open the technician dashboard, filter each lifecycle state and inspect priority ordering and ticket cards.",
+      "expected": "Authorized technicians see the permitted queue, status filters and history; cards show station ID, priority and time since submission. Labels follow D04.",
+      "id": "UAT-F08"
+    },
+    {
+      "title": "Claim and technician assignment",
+      "source": "TS p. 14, Feature 2 sequence; FS p. 6; D04",
+      "steps": "Claim a pending ticket and reopen it as the assigned technician.",
+      "expected": "The ticket records the technician and claim time, moves to the approved active state and updates the dashboard and history.",
+      "id": "UAT-F09"
+    },
+    {
+      "title": "Controlled lifecycle changes",
+      "source": "FS pp. 6, 12; TS p. 14, FR2.2; D04",
+      "steps": "Move a ticket through each approved state and attempt an unsupported state change.",
+      "expected": "Only approved transitions succeed; the ticket, queue and audit history remain consistent for New/Pending, Assigned, In Progress, Escalated and Resolved as agreed.",
+      "id": "UAT-F10"
+    },
+    {
+      "title": "Start and stop job card timer",
+      "source": "FS pp. 11-12, Job Cards; PP Appendix A UAT-02",
+      "steps": "Start a timer, wait a measured interval and stop it; inspect the job card and time log.",
+      "expected": "Start and stop timestamps persist, active work changes the state to In Progress, duration is calculated to the second and the displayed total matches MongoDB.",
+      "id": "UAT-F11"
+    },
+    {
+      "title": "Accumulated work sessions",
+      "source": "FS p. 12, Job Cards",
+      "steps": "Start and stop two measured work sessions for the same ticket, then reopen the job card.",
+      "expected": "The total adds both sessions correctly in minutes/hours, persists after reload and has timestamped audit entries for the time records.",
+      "id": "UAT-F12"
+    },
+    {
+      "title": "Claim to resolution elapsed time",
+      "source": "TS p. 15, FR2.5; FS p. 12; D06",
+      "steps": "Record a claim time, pause active work and later resolve the ticket; compare reported durations.",
+      "expected": "Claim-to-resolution elapsed time is calculated and saved separately from accumulated active timer time and creation-to-closure turnaround, using approved D06 definitions.",
+      "id": "UAT-F13"
+    },
+    {
+      "title": "Resolve with mandatory summary",
+      "source": "FS p. 12, Resolution; TS p. 14, FR2.3",
+      "steps": "Attempt resolution with no summary, then enter troubleshooting steps and resolve.",
+      "expected": "An empty summary prevents closure; valid resolution records notes and closure time, archives the ticket from active queues and triggers the user notification.",
+      "id": "UAT-F14"
+    },
+    {
+      "title": "NWU Central IT escalation",
+      "source": "TS pp. 8, 11, 14-15, FR2.4; FS p. 16 ISS-03",
+      "steps": "Escalate a ticket with a reason and inspect the hand-off record with the supervisor.",
+      "expected": "Status becomes Escalated to NWU IT with reason and traceable administrative hand-off; integration records referrals without requiring write access to central IT databases.",
+      "id": "UAT-F15"
+    },
+    {
+      "title": "Chronological ticket conversation",
+      "source": "FS p. 12, Communication; TS p. 16, FR5.1",
+      "steps": "Reporter and assigned technician exchange several comments on one ticket; reload the thread.",
+      "expected": "Messages remain linked to the correct Ticket ID, in time order, with sender identity and timestamp; both permitted parties see the same persisted conversation.",
+      "id": "UAT-F16"
+    },
+    {
+      "title": "Comment notification to counterparty",
+      "source": "FS p. 12; TS p. 17, FR5.2",
+      "steps": "Add a public technician comment, then a reporter reply; inspect both NWU inboxes.",
+      "expected": "Each new public comment triggers an alert to the other party with the relevant ticket link and without exposing another ticket conversation.",
+      "id": "UAT-F17"
+    },
+    {
+      "title": "Internal technician notes",
+      "source": "FS p. 7; TS p. 17, FR5.3",
+      "steps": "Post an Internal Only note, then inspect the ticket and notification content as IT staff and as reporter.",
+      "expected": "Authorized IT staff can read the note; the student/staff reporter cannot view it in the UI, API responses or notification contents.",
+      "id": "UAT-F18"
+    },
+    {
+      "title": "Immutable communication history",
+      "source": "TS p. 17, FR5.4",
+      "steps": "Post comments and attempt to edit or delete the existing communication through the UI and API.",
+      "expected": "Posted communication remains immutable and cannot be deleted; the complete troubleshooting history persists under the approved retention approach D08.",
+      "id": "UAT-F19"
+    },
+    {
+      "title": "Ticket receipt email",
+      "source": "FS pp. 11-12; TS p. 15, FR3.3",
+      "steps": "Submit a valid ticket and inspect the generated email and delivery evidence.",
+      "expected": "An automatic receipt contains the unique Ticket ID and submitted summary, reaches the correct NWU inbox and links to the ticket.",
+      "id": "UAT-F20"
+    },
+    {
+      "title": "Creation claim status and resolution alerts",
+      "source": "FS p. 12, Notifications; TS p. 15, FR3.1-3.2",
+      "steps": "Create, claim, change status and resolve a ticket; capture the resulting notification for each event.",
+      "expected": "The NWU SMTP service dispatches correctly addressed, template-based updates for all specified events with the right status, dynamic data and direct ticket link.",
+      "id": "UAT-F21"
+    },
+    {
+      "title": "Historical search and filtering",
+      "source": "FS pp. 12-13, Reporting; TS p. 16, FR4.2",
+      "steps": "Filter historical tickets by date range, technician and hardware/category; compare selected records.",
+      "expected": "Only matching tickets are returned and the filters produce consistent inputs for management reports.",
+      "id": "UAT-F22"
+    },
+    {
+      "title": "Management metrics and charts",
+      "source": "FS pp. 6-7, 12-13; TS p. 16, FR4.3",
+      "steps": "Use a known dataset to calculate turnaround, response times, resolution rates, category counts and workload totals.",
+      "expected": "Admin graphs and tables match the source data, show workload distribution and recurring faults, and use correct time definitions including creation-to-closure turnaround.",
+      "id": "UAT-F23"
+    },
+    {
+      "title": "CSV and PDF reporting",
+      "source": "FS p. 13, Admin Reporting",
+      "steps": "Apply report filters and download the report in CSV and PDF; open both downloads.",
+      "expected": "Both report formats contain the selected data and accurate metrics; files are readable and accessible only to the authorized role.",
+      "id": "UAT-F24"
+    },
+    {
+      "title": "Permanent ticket audit trail",
+      "source": "FS pp. 6-7, 13; TS p. 16, FR4.1; pp. 24, 26",
+      "steps": "Perform login attempts, claims, state changes, time entries and closure; review the audit data as Admin.",
+      "expected": "Critical actions have actor and timestamp records, every state change exists in audit_logs and each resolved ticket identifies its technician and closure time; records resist modification.",
+      "id": "UAT-F25"
+    },
+    {
+      "title": "Live status and dashboard updates",
+      "source": "FS p. 13, Performance; TS pp. 18, 21-22",
+      "steps": "Open reporter and technician views in separate sessions; create a ticket, change status and post a comment.",
+      "expected": "Ticket lists, status and public messages update asynchronously without a full page refresh, with near real-time visibility and recorded latency.",
+      "id": "UAT-F26"
+    },
+    {
+      "title": "End to end student and staff workflow",
+      "source": "FS pp. 6, 11-13; PP M6",
+      "steps": "As Student and Staff, submit an issue, read the receipt, reply to the technician and follow the ticket to resolution.",
+      "expected": "Both user groups complete the full reporting and communication workflow successfully and receive the final resolution update.",
+      "id": "UAT-F27"
+    },
+    {
+      "title": "End to end technician and Admin workflow",
+      "source": "FS pp. 9-13; TS pp. 14-17; PP M6",
+      "steps": "As Technician, claim, time, discuss and resolve a fault; as Admin, inspect its history and report.",
+      "expected": "All job card, notification, audit and reporting records agree for the same ticket, with role boundaries maintained throughout.",
+      "id": "UAT-F28"
+    },
+    {
+      "title": "MERN architecture and frontend baseline",
+      "source": "FS pp. 6-8, 10; TS pp. 12, 19, 3.7.1; D02",
+      "steps": "Inspect deployed components, dependency versions and the approved frontend decision.",
+      "expected": "MongoDB, Express and Node.js implement persistence and backend logic. React SPA in FS versus Vanilla JavaScript in TS is resolved and evidenced under D02.",
+      "id": "UAT-T01"
+    },
+    {
+      "title": "Runtime framework and server OS",
+      "source": "TS pp. 10, 19-20, 3.7.1-3.7.3",
+      "steps": "Record installed versions and verify startup in the target server environment.",
+      "expected": "Node.js is v20.x or greater; Express.js v4.x baseline is verified; target is Ubuntu Server 22.04 LTS or configured Windows Server with a Node process manager such as PM2.",
+      "id": "UAT-T02"
+    },
+    {
+      "title": "Approved hosting and local data storage",
+      "source": "FS pp. 7-8; TS pp. 10, 19; PP Procurement; D05",
+      "steps": "Inspect application/DB hosting, data locations, server allocation and available storage.",
+      "expected": "The approved CSIS physical/virtual host supports the runtime and persistent ticket/audit storage; data location follows the agreed university boundary and D05.",
+      "id": "UAT-T03"
+    },
+    {
+      "title": "Browser and desktop platform coverage",
+      "source": "FS p. 7; TS pp. 10, 20, 25-26",
+      "steps": "Run submission, dashboard and notification-link workflows in Chrome, Firefox, Edge and Safari on supported desktops.",
+      "expected": "Functional parity is recorded for Chrome/Firefox/Edge, with FS Safari coverage; Windows 10/11, macOS and Linux browser access works without client installation.",
+      "id": "UAT-T04"
+    },
+    {
+      "title": "Mobile compatibility and touch workflow",
+      "source": "FS pp. 7, 10, 13; TS pp. 10, 17-19, 25-26",
+      "steps": "Use Android and iOS phones/tablets to submit, claim, time, comment and resolve tickets.",
+      "expected": "Mobile workflows match desktop functionality with readable responsive layouts and touch-friendly controls; FS Android 8.0+ and iOS 11.3+ support is documented or dispositioned.",
+      "id": "UAT-T05"
+    },
+    {
+      "title": "Minimum client hardware and campus network",
+      "source": "FS p. 7; TS pp. 18-19, 21",
+      "steps": "Exercise workflows on a 2 GB RAM dual-core desktop at 720p and a 2 GB quad-core mobile device with a 5-inch display.",
+      "expected": "Core functions remain usable with keyboard/mouse or touch over stable LAN, Wi-Fi or approved mobile access; standard 10/100 campus networking is sufficient.",
+      "id": "UAT-T06"
+    },
+    {
+      "title": "NWU branding and status indicators",
+      "source": "FS p. 13, Usability; TS pp. 17-18, 3.5.1-3.5.2",
+      "steps": "Inspect the portal, job cards and Admin views against the approved NWU identity.",
+      "expected": "Purple/white branding and typography are consistent; deep purple #4B2C70 primary elements, slate secondary actions and labelled green/amber/red statuses follow the specified design.",
+      "id": "UAT-T07"
+    },
+    {
+      "title": "WCAG accessibility and keyboard navigation",
+      "source": "TS p. 17, 3.5.1; PP M4",
+      "steps": "Review WCAG 2.1 evidence and manually navigate login, submission, timers, comments and reports using only the keyboard.",
+      "expected": "The specified WCAG 2.1 requirements, including contrast and keyboard access, are met; focus and labels support the workflows. Attach the audit scope and findings.",
+      "id": "UAT-T08"
+    },
+    {
+      "title": "Clear UI and conceptual screen coverage",
+      "source": "FS pp. 10, 13; TS pp. 12, 18, 3.5.4",
+      "steps": "Review the submission portal, recent tickets, job card board and analytics screen with end users.",
+      "expected": "Labels and errors are understandable; Log New Fault/recent-ticket access, station/priority/time details and lab/category analytics are present. Conceptual layouts are reviewed against approved designs.",
+      "id": "UAT-T09"
+    },
+    {
+      "title": "HTTP API and JSON data exchange",
+      "source": "FS pp. 10-11; TS pp. 20-21, 3.7.4, 3.8.1-3.8.2",
+      "steps": "Trace browser requests for create, read and update actions using authorized technical tools.",
+      "expected": "REST methods such as GET, POST and PUT exchange structured JSON between browser and backend; MongoDB storage and outbound Admin metrics follow the specified data flow.",
+      "id": "UAT-T10"
+    },
+    {
+      "title": "HTTPS and TLS protection",
+      "source": "FS pp. 7, 11, 13; TS pp. 20-21, 24",
+      "steps": "Inspect web endpoints and TLS negotiation for login, ticket operations and report downloads.",
+      "expected": "Web traffic uses HTTPS with TLS 1.2 or higher, protecting credentials and ticket data in transit; unencrypted access cannot expose protected data.",
+      "id": "UAT-T11"
+    },
+    {
+      "title": "Secure institutional SMTP integration",
+      "source": "FS pp. 7, 11-12; TS pp. 19-21, 3.7.2, 3.8.2",
+      "steps": "Inspect Nodemailer configuration, relay permissions, transport encryption and test deliveries.",
+      "expected": "Notifications use the NWU gateway and approved NWU addresses. Port 587 with STARTTLS meets the secure baseline; any port 25 use cited in TS p. 20 has an approved encrypted relay configuration.",
+      "id": "UAT-T12"
+    },
+    {
+      "title": "Asynchronous notification processing",
+      "source": "TS pp. 21-22, 3.8.1, 3.9.3",
+      "steps": "Generate multiple notification events while submitting and updating tickets; inspect delivery queue evidence.",
+      "expected": "Email processing does not block application requests and sustained test traffic leaves no unresolved notification backlog.",
+      "id": "UAT-T13"
+    },
+    {
+      "title": "JWT session enforcement",
+      "source": "FS p. 11; TS pp. 11, 20-21, 24",
+      "steps": "Call management APIs with a valid token, no token, an altered token and an expired token.",
+      "expected": "Signed JWTs establish identity and role for protected requests; invalid or absent tokens cannot claim, close or alter tickets or audit data. D01 governs reporter entry.",
+      "id": "UAT-T14"
+    },
+    {
+      "title": "Standalone authentication boundary",
+      "source": "TS p. 20, 3.7.5; FS p. 16 ISS-05",
+      "steps": "Review login dependencies and management access with central SSO unavailable.",
+      "expected": "Management authentication operates using the internal module; no unavailable central Active Directory/SSO API is required for the initial release. Future integrations remain separately scoped.",
+      "id": "UAT-T15"
+    },
+    {
+      "title": "Role and object authorization",
+      "source": "FS p. 13, Security; TS p. 24, 3.11.1",
+      "steps": "Attempt own/other reporter reads and edits, technician ticket actions, role changes and Admin report/log access.",
+      "expected": "Reporters are limited to their own tickets; technicians manage approved workloads; reports/system logs and permission changes are restricted to authorized administrators. Resolve queue scope in D04.",
+      "id": "UAT-T16"
+    },
+    {
+      "title": "bcrypt credential storage",
+      "source": "TS p. 24, 3.11.1",
+      "steps": "Inspect test-account credential records and password verification configuration with an authorized administrator.",
+      "expected": "Stored passwords are salted bcrypt hashes with the configured high work factor; no plaintext credential storage is present. Record configuration evidence without copying secrets.",
+      "id": "UAT-T17"
+    },
+    {
+      "title": "Server input sanitization",
+      "source": "TS pp. 21, 24, 3.8.3, 3.11.2",
+      "steps": "In the test environment submit malformed values, NoSQL operators and inert XSS/injection test strings through forms and API calls.",
+      "expected": "Server validation using express-validator prevents injection, unauthorized database access and browser script execution, including when client validation is bypassed.",
+      "id": "UAT-T18"
+    },
+    {
+      "title": "MongoDB network access restriction",
+      "source": "TS p. 24, 3.11.3",
+      "steps": "Review database firewall/bind rules and attempt database connections from permitted and unpermitted test hosts.",
+      "expected": "Only the application server IP can connect to MongoDB; direct client or unapproved-host access is denied.",
+      "id": "UAT-T19"
+    },
+    {
+      "title": "Personal information purpose and protection",
+      "source": "FS pp. 7-8, 13; TS pp. 23-24",
+      "steps": "Review collected names, NWU emails, ticket content, access permissions and encryption/security evidence with the responsible reviewer.",
+      "expected": "Personal data supports incident resolution and follows documented POPIA and university handling controls; access and data protection evidence is attached for acceptance review.",
+      "id": "UAT-T20"
+    },
+    {
+      "title": "Retention archive and anonymization",
+      "source": "TS p. 24, 3.11.3; FS p. 13; D08",
+      "steps": "Review the approved post-2026 retention procedure and exercise it on test records.",
+      "expected": "Records are archived or anonymized after the academic cycle according to the approved policy, while audit traceability and immutable operational history are handled as agreed in D08.",
+      "id": "UAT-T21"
+    },
+    {
+      "title": "UI response within two seconds",
+      "source": "FS p. 13, Performance; TS p. 22, 3.9.1; PP M4",
+      "steps": "Measure login, ticket acknowledgement, timer start and ordinary status/message interactions under normal network conditions.",
+      "expected": "Standard input responses and ticket acknowledgement are within 2.0 seconds; record timings, network conditions and any failures. PP page-load checks are also captured.",
+      "id": "UAT-T22"
+    },
+    {
+      "title": "Fifty concurrent connections",
+      "source": "TS p. 22, 3.9.3; D07",
+      "steps": "Run at least 50 simultaneous connections exercising submissions, status changes and notifications.",
+      "expected": "Service remains responsive without data corruption or service decline; capture response times, error counts and notification queue drain evidence.",
+      "id": "UAT-T23"
+    },
+    {
+      "title": "Large histories and resource efficiency",
+      "source": "TS p. 22, 3.9.2; FS p. 13",
+      "steps": "Load representative large ticket histories and monthly reports on older lab and mobile clients; record CPU/RAM and timings.",
+      "expected": "The system remains usable without client slowdown or significant lag. Record observed limits and agree a dataset and qualitative acceptance decision where no numeric budget is specified.",
+      "id": "UAT-T24"
+    },
+    {
+      "title": "Concurrent dashboard synchronization",
+      "source": "TS p. 22, 3.8.4",
+      "steps": "Open two technician sessions, create a new fault and attempt to claim the same ticket from both sessions.",
+      "expected": "Polling or supported WebSockets promptly refresh both views; one consistent technician assignment is retained and conflicting claims do not overwrite each other silently.",
+      "id": "UAT-T25"
+    },
+    {
+      "title": "Functional specification availability target",
+      "source": "FS p. 13, Availability; D03",
+      "steps": "Review monitoring logs for the agreed academic-hours observation window and calculate uptime.",
+      "expected": "Measure against the FS target of 99.9% during standard academic hours; record window, downtime and result separately from the technical target until D03 is approved.",
+      "id": "UAT-T26"
+    },
+    {
+      "title": "Technical availability and downtime target",
+      "source": "TS p. 25, 3.12.2; D03",
+      "steps": "Review logs for 07:30-18:00 Monday-Friday and semester unplanned downtime.",
+      "expected": "Measure both TS requirements: 98% uptime in that window and no more than 9.5 hours unplanned downtime per semester. Record period and resolve the differing targets under D03.",
+      "id": "UAT-T27"
+    },
+    {
+      "title": "Unassisted student learnability",
+      "source": "TS p. 25, 3.12.3",
+      "steps": "Have 10 new students independently submit a fault without training or verbal assistance; record each elapsed time.",
+      "expected": "All 10 students submit successfully without verbal help and each submission takes less than 60 seconds; attach participant timing evidence.",
+      "id": "UAT-T28"
+    },
+    {
+      "title": "Hazard priority and visual alert",
+      "source": "TS p. 23, 3.10.1; D09",
+      "steps": "Submit safe test descriptions of live-wire/burning-equipment hazards and inspect the technician dashboard.",
+      "expected": "Physical-risk tickets receive Critical/Hazardous priority and a prominent red labelled alert for immediate attention; no actual hazardous equipment is needed for testing.",
+      "id": "UAT-T29"
+    },
+    {
+      "title": "Recurring hardware fault visibility",
+      "source": "TS pp. 18, 23, 3.10.1",
+      "steps": "Create recurring hardware-failure examples for the same lab location/server rack and inspect historical reports.",
+      "expected": "Technicians and management can identify repeated location-specific failures for investigation, including potential overheating/cooling patterns.",
+      "id": "UAT-T30"
+    },
+    {
+      "title": "Crash safe ticket updates",
+      "source": "TS p. 23, 3.10.2",
+      "steps": "In an isolated test environment interrupt a status update, recover the service and inspect ticket and audit data.",
+      "expected": "Transactional handling restores the last known good state or a fully committed update; no partial or lost hazard ticket remains.",
+      "id": "UAT-T31"
+    },
+    {
+      "title": "Unanswered physical hazard escalation",
+      "source": "TS p. 23, 3.10.2",
+      "steps": "Set and record the approved hazard timeout, leave a Physical Hazard test ticket unanswered and observe escalation.",
+      "expected": "At the predetermined interval the Lab Manager receives the escalation notification. Thirty minutes is an example in TS, not a fixed threshold until approved.",
+      "id": "UAT-T32"
+    },
+    {
+      "title": "Safety records and reminders",
+      "source": "TS p. 23, 3.10.3",
+      "steps": "Review a hardware fault submission and retrieve the hazard handling history with the safety reviewer.",
+      "expected": "The form displays approved NWU laboratory safety reminders; digital records show reported hazards and actions for the institution safety review and OHSA evidence.",
+      "id": "UAT-T33"
+    },
+    {
+      "title": "Daily automated database backups",
+      "source": "TS p. 26, 3.12.6; PP Risk Plan",
+      "steps": "Inspect backup schedules, logs and artifacts for consecutive 24-hour windows.",
+      "expected": "MongoDB backups run automatically and successfully at least once per 24-hour window; evidence identifies the latest recoverable backup.",
+      "id": "UAT-T34"
+    },
+    {
+      "title": "Restore within two hours",
+      "source": "TS p. 26, 3.12.6",
+      "steps": "Restore a backup into an isolated environment using the documented procedure; time the operation and validate records.",
+      "expected": "The database returns to its last known good backed-up state within 2 hours, with ticket, user, time-log and audit integrity verified.",
+      "id": "UAT-T35"
+    },
+    {
+      "title": "Endpoint documentation and code quality",
+      "source": "FS pp. 8-9, 13; TS p. 25, 3.12.1",
+      "steps": "Review all backend endpoints, code comments, schema naming and static analysis results.",
+      "expected": "Every endpoint has JSDoc or Swagger documentation; ESLint or equivalent reports no critical style violations. snake_case data names and PascalCase modules follow TS conventions or documented exceptions.",
+      "id": "UAT-T36"
+    },
+    {
+      "title": "Developer onboarding and modular maintenance",
+      "source": "FS pp. 8-9, 13; TS p. 25, 3.12.1",
+      "steps": "Give a new maintainer the README and repository; time setup and review separation of major modules.",
+      "expected": "The maintainer can run the application in less than 20 minutes using the README; commented modular code supports future maintenance and deployment to other departments.",
+      "id": "UAT-T37"
+    },
+    {
+      "title": "End user help and manuals",
+      "source": "FS p. 9, User Documentation; TS pp. 11-12",
+      "steps": "Open the quick-start PDF, login-page FAQ and user/technician/Admin manuals; follow a workflow from each.",
+      "expected": "Help covers access/login and password recovery, submission/categories, ticket status, timer use, secure comments, reports, user roles and troubleshooting in clear visual steps.",
+      "id": "UAT-T38"
+    },
+    {
+      "title": "Technical documentation and models",
+      "source": "FS pp. 9, 15; TS pp. 11-12, 27-28",
+      "steps": "Review the handover set and referenced analysis models against the release.",
+      "expected": "Architecture, ERD, state transitions, wireframes, schemas, server deployment, SMTP setup and failure troubleshooting are available, current and professionally typed; external references follow NWU Harvard style.",
+      "id": "UAT-T39"
+    },
+    {
+      "title": "Version control and update delivery",
+      "source": "FS p. 8; TS pp. 12-13, 20",
+      "steps": "Review GitHub history, repository documentation and the departmental deployment/update procedure.",
+      "expected": "Source and technical documents are version controlled, secure SSH/HTTPS supports repository access and the documented update process delivers the approved release to the departmental server.",
+      "id": "UAT-T40"
+    },
+    {
+      "title": "Zero licence cost and launch scope",
+      "source": "FS p. 8; TS p. 11, 2.5.2-2.5.3; PP Financial Plan",
+      "steps": "Review production dependencies, service plans and permitted deployment audience.",
+      "expected": "The release uses approved free/open-source tooling and university resources with zero new licensing costs; initial launch is restricted to CSIS labs/offices within the 2026 scope.",
+      "id": "UAT-T41"
+    },
+    {
+      "title": "Automated API and security acceptance evidence",
+      "source": "PP Acceptance Plan M3; Quality Plan",
+      "steps": "Review the release automated API/unit test suite and security assessment.",
+      "expected": "Automated API tests have a 100% pass rate and there are zero critical security vulnerabilities; attach the release-specific reports.",
+      "id": "UAT-P01"
+    },
+    {
+      "title": "One hundred user performance exercise",
+      "source": "PP Quality Plan, Performance Load Testing; D07",
+      "steps": "Simulate up to 100 users performing representative workflows and capture response-time and integrity results.",
+      "expected": "The project-plan sub-2.0-second response target is assessed at the 100-user profile; retain this evidence separately from the TS minimum of 50 connections.",
+      "id": "UAT-P02"
+    },
+    {
+      "title": "Resolution email within two minutes",
+      "source": "PP Appendix A UAT-03; FS p. 12",
+      "steps": "Change a test ticket to Resolved; record trigger, dispatch and inbox arrival times.",
+      "expected": "The resolution email dispatches within 2 minutes of the trigger. Record inbox arrival separately so dispatch and delivery are distinguishable.",
+      "id": "UAT-P03"
+    },
+    {
+      "title": "Infrastructure and relay readiness",
+      "source": "FS p. 16 ISS-02; TS p. 28 ISS-001/002; PP Procurement",
+      "steps": "Review the allocated host, database access, network paths, SMTP credentials and relay permission evidence.",
+      "expected": "The dedicated environment and email relay are provisioned and verified; unresolved dependencies have owners and cannot be recorded as passed without evidence.",
+      "id": "UAT-P04"
+    },
+    {
+      "title": "Operational transfer and deployment verification",
+      "source": "PP Appendix D; Acceptance Plan M7",
+      "steps": "Review repository ownership, VM/SSH and MongoDB access transfer with the CSIS Network Administrator; verify deployed workflows.",
+      "expected": "The permanent maintainer receives ownership/access through secure channels, environment/IP/connection documentation and user guides; sponsor reviews deployment and handover evidence.",
+      "id": "UAT-P05"
+    },
+    {
+      "title": "User adoption and escalation readiness",
+      "source": "FS p. 16 ISS-01/03/04/06; PP Risk Plan",
+      "steps": "Review assigned maintenance capacity, the approved NWU escalation procedure and transition from the legacy support mailbox.",
+      "expected": "A support owner, clear user guide and escalation hand-off exist; the planned automatic legacy-mailbox reply directs users to the portal and outstanding project issues have recorded actions.",
+      "id": "UAT-P06"
+    },
+    {
+      "title": "Future file attachments",
+      "source": "TS p. 17, FR5.5",
+      "steps": "Review architecture and any separately approved attachment scope.",
+      "expected": "The design can be extended to screenshot/log uploads; implemented upload functionality is a future enhancement unless explicitly included in this release.",
+      "id": "UAT-O01"
+    },
+    {
+      "title": "Optional offline queue viewing",
+      "source": "FS p. 14, Offline Resilience",
+      "steps": "Review service-worker/cache design and, only if implemented, view a queue during a simulated disconnection.",
+      "expected": "Offline access is optional/future scope; record implementation evidence or an approved N/A disposition without making it a current mandatory gate.",
+      "id": "UAT-O02"
+    },
+    {
+      "title": "Optional browser printing",
+      "source": "TS p. 19, 3.6.3",
+      "steps": "If in scope, use browser print on a job card or solution report.",
+      "expected": "The optional printed output is readable through standard OS/browser printing; otherwise record approved N/A.",
+      "id": "UAT-O03"
+    },
+    {
+      "title": "Future Outlook or central system integrations",
+      "source": "FS p. 16 ISS-05; TS pp. 11, 20",
+      "steps": "Review proposed integration boundaries and MFA/SSO dependencies with the supervisor.",
+      "expected": "Future Outlook/calendar and full central-system integration remain separately approved work; initial escalation record and local management login remain testable without them.",
+      "id": "UAT-O04"
+    }
+  ]
+}
