@@ -40,24 +40,25 @@ export default function Application() {
     try { await api("/api/auth/logout", { method: "POST" }); } finally { setUser(null); setSection("overview"); }
   }
 
-  if (checking) return <main className="flex min-h-screen items-center justify-center bg-slate-50"><LoaderCircle className="size-8 animate-spin text-[#4B2C70]" aria-label="Checking session" /></main>;
+  if (checking) return <main className="flex min-h-dvh flex-col bg-slate-50"><div className="flex flex-1 items-center justify-center"><LoaderCircle className="size-8 animate-spin text-[#4B2C70]" aria-label="Checking session" /></div><PortalFooter className="text-slate-500" /></main>;
   if (!user) return <AuthenticationPage onAuthenticated={setUser} />;
 
   const navigation = navigationFor(user, activeJobCards);
   function navigate(next: PortalSection) { setSection(next); setMobileOpen(false); }
 
-  return <div className="min-h-screen bg-[#f7f8fa] lg:grid lg:grid-cols-[264px_minmax(0,1fr)]">
+  return <div className="min-h-dvh bg-[#f7f8fa] lg:grid lg:grid-cols-[264px_minmax(0,1fr)]">
     <aside className={`portal-sidebar-motion z-30 flex h-dvh flex-col overflow-hidden border-r border-white/10 bg-[#4B2C70] text-white lg:sticky lg:top-0 lg:h-screen ${mobileOpen ? "fixed inset-0" : "hidden lg:flex"}`}>
       <div className="flex items-center justify-between border-b border-white/10 px-6 py-6"><div className="flex items-center gap-3"><img src="/ticket-logo.png?v=2" alt="CSIS IT Support logo" className="size-10 rounded-full object-contain" /><div><p className="font-semibold">CSIS IT Support</p><p className="text-xs text-purple-200">Ticket and Log System</p></div></div><Button size="icon" variant="ghost" className="text-white hover:bg-white/10 lg:hidden" onClick={() => setMobileOpen(false)}><X /></Button></div>
       <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 py-6" aria-label="Portal navigation">{navigation.map((item) => { const Icon = item.icon; const active = section === item.id; return <button key={item.id} onClick={() => navigate(item.id)} className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition ${active ? "bg-white text-[#4B2C70] shadow-sm" : "text-purple-100 hover:bg-white/10 hover:text-white"}`}><Icon className="size-4.5" /><span className="flex-1">{item.label}</span>{item.badge ? <span className={`rounded-full px-2 py-0.5 text-xs ${active ? "bg-purple-100" : "bg-white/15 text-white"}`}>{item.badge}</span> : null}</button>; })}</nav>
       <div className="shrink-0 border-t border-white/10 p-4"><div className="rounded-xl bg-white/10 p-3"><p className="truncate text-sm font-medium">{user.fullName}</p><p className="mt-0.5 truncate text-xs text-purple-200">{user.email}</p><Badge className="mt-2 bg-white/15 text-white">{formatValue(user.role)}</Badge></div><Button variant="ghost" className="mt-2 h-auto w-full justify-start gap-3 px-3 py-2.5 text-base font-medium text-purple-100 hover:bg-white/10 hover:text-white" onClick={() => void logout()}><LogOut className="size-5" /> Sign out</Button></div>
     </aside>
-    <div className="min-w-0">
+    <div className="flex min-h-dvh min-w-0 flex-col">
       <header className="sticky top-0 z-20 flex items-center justify-between border-b bg-white/95 px-4 py-3 backdrop-blur sm:px-6 lg:px-8"><div className="flex items-center gap-3"><Button size="icon" variant="outline" className="lg:hidden" onClick={() => setMobileOpen(true)}><Menu /></Button><div><p className="text-sm font-semibold">{pageTitle(section, user)}</p></div></div><div className="flex items-center gap-2"><span className="hidden text-sm text-muted-foreground md:block">{user.fullName}</span><div className="flex size-9 items-center justify-center rounded-full bg-purple-100 text-sm font-semibold text-[#4B2C70]">{initials(user.fullName)}</div></div></header>
-      <main className="mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8">
+      <main className="mx-auto w-full max-w-[1500px] flex-1 p-4 sm:p-6 lg:p-8">
         {(user.role === "REPORTER" || user.role === "TECHNICIAN") && <div className="mb-9"><p className="text-sm font-medium uppercase tracking-[0.16em] text-[#4B2C70]">{user.role === "REPORTER" ? "Reporter portal" : "Technician workspace"}</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">{section === "overview" ? `Welcome, ${user.fullName.split(" ")[0]}` : pageTitle(section, user)}</h1></div>}
         <PortalContent user={user} section={section} onJobCardsChanged={setActiveJobCards} />
       </main>
+      <PortalFooter className="text-slate-500" />
     </div>
   </div>;
 }
@@ -165,10 +166,10 @@ function AuthenticationPage({ onAuthenticated }: { onAuthenticated: (user: User)
       : audience === "ADMIN"
         ? "Access administration tools with your authorised NWU account."
         : "Sign in using your @mynwu.ac.za email address.";
-  return <main className="relative isolate flex min-h-dvh items-center justify-center overflow-x-hidden px-4 py-12 sm:px-6">
+  return <main className="relative isolate flex min-h-dvh flex-col overflow-x-hidden px-4 pt-24 pb-3 sm:px-6">
     <AuthBackdrop />
     <AuthBrand />
-    <div className="auth-content-enter relative z-10 w-full max-w-lg">
+    <div className="auth-content-enter relative z-10 mx-auto my-auto w-full max-w-lg">
       <Card className="border-white/60 bg-white/95 text-slate-900 shadow-2xl shadow-[#24113c]/25 backdrop-blur">
         <CardHeader className="relative pr-14">
           {mode === "login" && <LoginHelp />}
@@ -191,8 +192,8 @@ function AuthenticationPage({ onAuthenticated }: { onAuthenticated: (user: User)
           </form>
         </CardContent>
       </Card>
-      <p className="mt-5 text-center text-xs text-white/85">© 2026 North-West University · CSIS IT Support</p>
     </div>
+    <PortalFooter className="mt-auto text-white/75" />
   </main>;
 }
 
@@ -241,8 +242,12 @@ function PortalLanding({ onChoose }: { onChoose: (audience: SignInAudience) => v
         <span className="hidden items-center gap-2 text-sm font-semibold sm:flex">Continue <ArrowRight className="size-4" /></span>
       </button>
     </section>
-    <footer className="relative z-10 px-4 pb-5 text-center text-xs text-white/75">© 2026 North-West University · CSIS IT Support</footer>
+    <PortalFooter className="text-white/75" />
   </main>;
+}
+
+function PortalFooter({ className = "" }: { className?: string }) {
+  return <footer className={`relative z-10 px-4 py-5 text-center text-xs ${className}`}>© 2026 North-West University · CSIS IT Support</footer>;
 }
 
 function AudienceCard({ icon: Icon, title, description, onClick }: { icon: typeof GraduationCap; title: string; description: string; onClick: () => void }) {
@@ -256,14 +261,15 @@ function AudienceCard({ icon: Icon, title, description, onClick }: { icon: typeo
 
 function PortalLoading({ audience }: { audience: SignInAudience | null }) {
   const audienceName = audience === "REPORTER" ? "reporter" : audience === "TECHNICIAN" ? "technician" : "administrator";
-  return <main className="relative isolate flex min-h-dvh items-center justify-center overflow-hidden px-6 text-center text-white" aria-live="polite" aria-busy="true">
+  return <main className="relative isolate flex min-h-dvh flex-col overflow-hidden px-6 pt-24 pb-3 text-center text-white" aria-live="polite" aria-busy="true">
     <AuthBackdrop />
     <AuthBrand />
-    <div className="auth-content-enter relative z-10 flex flex-col items-center">
+    <div className="auth-content-enter relative z-10 my-auto flex flex-col items-center">
       <LoaderCircle className="size-8 animate-spin text-white/90 motion-reduce:animate-none" aria-hidden="true" />
       <h1 className="mt-5 text-2xl font-semibold">Opening {audienceName} sign in…</h1>
       <p className="mt-2 text-sm text-white/80">Preparing your secure CSIS portal.</p>
     </div>
+    <PortalFooter className="text-white/75" />
   </main>;
 }
 

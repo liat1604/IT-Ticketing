@@ -3,6 +3,7 @@ import { hash } from "bcryptjs";
 import type { PoolClient } from "pg";
 
 import { pool } from "../db.js";
+import type { Department } from "../domain/departments.js";
 
 type UserRole = "REPORTER" | "TECHNICIAN" | "ADMIN" | "SYSTEM_ADMIN";
 type TicketStatus = "NEW" | "IN_PROGRESS" | "ESCALATED" | "RESOLVED";
@@ -18,6 +19,7 @@ type SeedTicket = {
   title: string;
   description: string;
   category: string;
+  department: Department;
   location: string;
   locationDetails: string;
   priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
@@ -37,6 +39,30 @@ type DemoCalendarEvent = {
   durationMinutes: number;
   location: string;
   notes: string;
+};
+
+type DemoWalkIn = {
+  title: string;
+  description: string;
+  category: string;
+  department: Department;
+  priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  location: string;
+  locationDetails: string;
+  stationReference: string;
+  reporterName: string;
+  reporterEmail: string;
+  targetInHours: number;
+  checklist: string[];
+};
+
+type DemoSubIssue = {
+  parentTicketKey: string;
+  title: string;
+  description: string;
+  category: string;
+  priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  dueInHours: number;
 };
 
 const users: SeedUser[] = [
@@ -76,6 +102,7 @@ const tickets: SeedTicket[] = [
     title: "Projector not displaying in Lab G14",
     description: "The lectern computer detects the projector, but the screen remains blank after restarting both devices.",
     category: "Hardware",
+    department: "CSIS",
     location: "Lab G14",
     locationDetails: "Front teaching station",
     priority: "MEDIUM",
@@ -87,6 +114,7 @@ const tickets: SeedTicket[] = [
     title: "Student portal login blocked",
     description: "The student receives an access denied message after completing multi-factor authentication.",
     category: "Access",
+    department: "Statistics",
     location: "Online",
     locationDetails: "Student portal",
     priority: "HIGH",
@@ -98,6 +126,7 @@ const tickets: SeedTicket[] = [
     title: "Intermittent Wi-Fi in Lab G30",
     description: "Connections drop every few minutes for multiple workstations during practical sessions.",
     category: "Network",
+    department: "CSIS",
     location: "Lab G30",
     locationDetails: "Rows B to D",
     priority: "HIGH",
@@ -110,6 +139,7 @@ const tickets: SeedTicket[] = [
     title: "MATLAB licence activation failure",
     description: "MATLAB reports that the campus licence server cannot be reached on several laboratory computers.",
     category: "Software",
+    department: "Mathematics",
     location: "Lab G14",
     locationDetails: "Stations 20 to 26",
     priority: "MEDIUM",
@@ -122,6 +152,7 @@ const tickets: SeedTicket[] = [
     title: "Core switch packet loss in Building G",
     description: "Monitoring shows sustained packet loss affecting multiple teaching laboratories and staff offices.",
     category: "Network",
+    department: "CSIS",
     location: "Building G",
     locationDetails: "Distribution cabinet G-02",
     priority: "CRITICAL",
@@ -136,6 +167,7 @@ const tickets: SeedTicket[] = [
     title: "Repeated account lockouts across lab PCs",
     description: "Multiple valid student accounts are being locked immediately after attempting to sign in to domain workstations.",
     category: "Access",
+    department: "Statistics",
     location: "Lab G30",
     locationDetails: "All student stations",
     priority: "HIGH",
@@ -150,6 +182,7 @@ const tickets: SeedTicket[] = [
     title: "Faulty keyboard at Station 12",
     description: "Several keys were unresponsive and prevented the workstation from being used for practical work.",
     category: "Hardware",
+    department: "Mathematics",
     location: "Lab G14",
     locationDetails: "Station 12",
     priority: "LOW",
@@ -163,6 +196,7 @@ const tickets: SeedTicket[] = [
     title: "UPS overheating warning in server room",
     description: "The monitoring panel reported elevated temperature and an audible warning from the secondary UPS.",
     category: "Physical Hazard",
+    department: "CSIS",
     location: "Server Room",
     locationDetails: "Secondary UPS rack",
     priority: "CRITICAL",
@@ -219,6 +253,64 @@ const demoCalendarEvents: DemoCalendarEvent[] = [
   },
 ];
 
+const demoWalkIns: DemoWalkIn[] = [
+  {
+    title: "Walk-in laptop Wi-Fi configuration",
+    description: "Configure the student laptop for secure campus Wi-Fi and verify access.",
+    category: "Network",
+    department: "CSIS",
+    priority: "LOW",
+    location: "Building G",
+    locationDetails: "CSIS help desk",
+    stationReference: "Personal laptop",
+    reporterName: "Thabo Molefe",
+    reporterEmail: "thabo.molefe@mynwu.ac.za",
+    targetInHours: 2,
+    checklist: ["Configure secure Wi-Fi profile", "Confirm internet access with the requester"],
+  },
+  {
+    title: "Walk-in staff account access",
+    description: "Restore access to the staff workstation and confirm the account can open required systems.",
+    category: "Access",
+    department: "Statistics",
+    priority: "MEDIUM",
+    location: "Building G",
+    locationDetails: "CSIS service counter",
+    stationReference: "Staff workstation F-08",
+    reporterName: "Naledi Khumalo",
+    reporterEmail: "naledi.khumalo@mynwu.ac.za",
+    targetInHours: 6,
+    checklist: ["Check account status", "Confirm workstation sign-in and required system access"],
+  },
+];
+
+const demoSubIssues: DemoSubIssue[] = [
+  {
+    parentTicketKey: "DEMO-WIFI-G30",
+    title: "Inspect access point uplink in Lab G30",
+    description: "Check the access point uplink, switch port errors and signal stability for the affected lab rows.",
+    category: "Network",
+    priority: "HIGH",
+    dueInHours: 5,
+  },
+  {
+    parentTicketKey: "DEMO-WIFI-G30",
+    title: "Test Wi-Fi roaming across Lab G30",
+    description: "Verify roaming and reconnect behavior on representative student workstations in rows B to D.",
+    category: "Network",
+    priority: "MEDIUM",
+    dueInHours: 10,
+  },
+  {
+    parentTicketKey: "DEMO-CORE-SWITCH",
+    title: "Collect packet-loss samples in Building G",
+    description: "Capture packet-loss measurements from the distribution cabinet and two affected teaching labs.",
+    category: "Network",
+    priority: "CRITICAL",
+    dueInHours: 3,
+  },
+];
+
 function assertDemoTicketCoverage() {
   const seededStatuses = new Set(tickets.map((ticket) => ticket.status));
   const missingStatuses = requiredTicketStatuses.filter(
@@ -231,6 +323,13 @@ function assertDemoTicketCoverage() {
 
   if (!tickets.some((ticket) => ticket.ageHours >= 72)) {
     throw new Error("Demo data must include at least one ticket older than 72 hours");
+  }
+
+  const seededDepartments = new Set(tickets.map((ticket) => ticket.department));
+  for (const department of ["CSIS", "Statistics", "Mathematics"] satisfies Department[]) {
+    if (!seededDepartments.has(department)) {
+      throw new Error(`Demo tickets are missing department: ${department}`);
+    }
   }
 }
 
@@ -324,6 +423,7 @@ async function main() {
                created_by = $1,
                assigned_to = $2,
                category_id = categories.id,
+               department = $14,
                location_id = locations.id,
                location_details = $3,
                title = $5,
@@ -343,13 +443,13 @@ async function main() {
          ),
          inserted AS (
            INSERT INTO tickets (
-             reporter_id, created_by, assigned_to, category_id, location_id,
+             reporter_id, created_by, assigned_to, category_id, department, location_id,
              location_details, station_reference, title, description,
              priority, status, source, resolution_summary, resolved_at,
              created_at, updated_at
            )
            SELECT
-             $1, $1, $2, categories.id, locations.id,
+             $1, $1, $2, categories.id, $14, locations.id,
              $3, $4, $5, $6,
              $7::ticket_priority, $8::ticket_status, 'WEB', $9, $10,
              CURRENT_TIMESTAMP - ($11 * INTERVAL '1 hour'), CURRENT_TIMESTAMP
@@ -377,6 +477,7 @@ async function main() {
           ticket.ageHours,
           ticket.category,
           ticket.location,
+          ticket.department,
         ],
       );
       const seeded = ticketResult.rows[0];
@@ -429,21 +530,123 @@ async function main() {
         );
       }
 
-      await client.query(
-        `INSERT INTO notification_outbox (ticket_id, recipient_email, event_type, payload)
-         SELECT $1, $2, $3, $4::jsonb
-         WHERE NOT EXISTS (
-           SELECT 1 FROM notification_outbox
-           WHERE ticket_id = $1 AND event_type = $3
-         )`,
-        [seeded.id, reporter.email, `DEMO_${ticket.status}`, JSON.stringify({ ticketNumber: seeded.ticket_number, title: ticket.title })],
-      );
     }
 
     const technicianId = userIds.get("sebastian.klopper@mynwu.ac.za");
     const linkedTicketId = ticketIds.get("DEMO-PROJECTOR-G14");
     if (!technicianId || !linkedTicketId) {
       throw new Error("The seeded technician and linked job-card ticket are required");
+    }
+
+    for (const subIssue of demoSubIssues) {
+      const parentId = ticketIds.get(subIssue.parentTicketKey);
+      if (!parentId) {
+        throw new Error(`Could not find parent ticket for sub-issue: ${subIssue.title}`);
+      }
+
+      const childResult = await client.query<{ id: string; ticket_number: string }>(
+        `WITH updated AS (
+           UPDATE tickets AS child
+           SET reporter_id = $1,
+               created_by = $2,
+               assigned_to = $2,
+               category_id = categories.id,
+               department = parent.department,
+               location_id = parent.location_id,
+               location_details = parent.location_details,
+               title = $4,
+               description = $5,
+               priority = $6::ticket_priority,
+               status = 'ASSIGNED',
+               source = parent.source,
+               due_at = CURRENT_TIMESTAMP + ($7 * INTERVAL '1 hour'),
+               updated_at = CURRENT_TIMESTAMP
+           FROM tickets AS parent, categories
+           WHERE child.parent_ticket_id = parent.id
+             AND parent.id = $3
+             AND child.title = $4
+             AND categories.name = $8
+           RETURNING child.id, child.ticket_number
+         ),
+         inserted AS (
+           INSERT INTO tickets (
+             reporter_id, created_by, assigned_to, category_id, department,
+             location_id, location_details, title, description, priority,
+             status, source, parent_ticket_id, due_at
+           )
+           SELECT
+             $1, $2, $2, categories.id, parent.department,
+             parent.location_id, parent.location_details, $4, $5,
+             $6::ticket_priority, 'ASSIGNED', parent.source, parent.id,
+             CURRENT_TIMESTAMP + ($7 * INTERVAL '1 hour')
+           FROM tickets AS parent, categories
+           WHERE parent.id = $3
+             AND categories.name = $8
+             AND NOT EXISTS (SELECT 1 FROM updated)
+             AND NOT EXISTS (
+               SELECT 1 FROM tickets AS existing
+               WHERE existing.parent_ticket_id = parent.id
+                 AND existing.title = $4
+             )
+           RETURNING id, ticket_number
+         )
+         SELECT id, ticket_number FROM updated
+         UNION ALL
+         SELECT id, ticket_number FROM inserted
+         LIMIT 1`,
+        [
+          reporter.id,
+          technicianId,
+          parentId,
+          subIssue.title,
+          subIssue.description,
+          subIssue.priority,
+          subIssue.dueInHours,
+          subIssue.category,
+        ],
+      );
+      const child = childResult.rows[0];
+      if (!child) throw new Error(`Could not seed sub-issue: ${subIssue.title}`);
+
+      await client.query(
+        `INSERT INTO audit_events (ticket_id, actor_id, action, new_values)
+         SELECT $1, $2, 'SUB_ISSUE_CREATED', $3::jsonb
+         WHERE NOT EXISTS (
+           SELECT 1 FROM audit_events
+           WHERE ticket_id = $1
+             AND action = 'SUB_ISSUE_CREATED'
+             AND new_values->>'childTicketId' = $4
+         )`,
+        [
+          parentId,
+          technicianId,
+          JSON.stringify({
+            childTicketId: child.id,
+            ticketNumber: child.ticket_number,
+            title: subIssue.title,
+            seed: true,
+          }),
+          child.id,
+        ],
+      );
+      await client.query(
+        `INSERT INTO audit_events (ticket_id, actor_id, action, new_values)
+         SELECT $1, $2, 'TICKET_CREATED', $3::jsonb
+         WHERE NOT EXISTS (
+           SELECT 1 FROM audit_events
+           WHERE ticket_id = $1 AND action = 'TICKET_CREATED'
+         )`,
+        [
+          child.id,
+          technicianId,
+          JSON.stringify({
+            parentTicketId: parentId,
+            status: "ASSIGNED",
+            priority: subIssue.priority,
+            seed: true,
+          }),
+        ],
+      );
     }
 
     for (const event of demoCalendarEvents) {
@@ -504,6 +707,7 @@ async function main() {
              title = 'Projector assessment in Lab G14',
              description = tickets.description,
              category_id = tickets.category_id,
+             department = tickets.department,
              priority = tickets.priority,
              location_id = tickets.location_id,
              location_details = tickets.location_details,
@@ -520,12 +724,12 @@ async function main() {
        inserted AS (
          INSERT INTO job_cards (
            primary_ticket_id, assigned_to, created_by, title, description,
-           category_id, priority, location_id, location_details,
+           category_id, department, priority, location_id, location_details,
            station_reference, target_at
          )
          SELECT
            tickets.id, $2, $2, 'Projector assessment in Lab G14',
-           tickets.description, tickets.category_id, tickets.priority,
+           tickets.description, tickets.category_id, tickets.department, tickets.priority,
            tickets.location_id, tickets.location_details,
            tickets.station_reference, CURRENT_TIMESTAMP + INTERVAL '8 hours'
          FROM tickets
@@ -540,57 +744,76 @@ async function main() {
       [linkedTicketId, technicianId],
     );
 
-    const walkInJobCard = await client.query<{ id: string }>(
-      `WITH updated AS (
-         UPDATE job_cards
-         SET primary_ticket_id = NULL,
-             assigned_to = $1,
-             created_by = $1,
-             description = 'Configure the student laptop for secure campus Wi-Fi and verify access.',
-             category_id = categories.id,
-             priority = 'LOW',
-             location_id = locations.id,
-             location_details = 'CSIS help desk',
-             station_reference = 'Personal laptop',
-             walk_in_reporter_name = 'Thabo Molefe',
-             walk_in_reporter_email = 'thabo.molefe@mynwu.ac.za',
-             updated_at = CURRENT_TIMESTAMP
-         FROM categories, locations
-         WHERE job_cards.title = 'Walk-in laptop Wi-Fi configuration'
-           AND job_cards.primary_ticket_id IS NULL
-           AND categories.name = 'Network'
-           AND locations.name = 'Building G'
-         RETURNING job_cards.id
-       ),
-       inserted AS (
-         INSERT INTO job_cards (
-           primary_ticket_id, assigned_to, created_by, title, description,
-           category_id, priority, location_id, location_details,
-           station_reference, walk_in_reporter_name, walk_in_reporter_email,
-           target_at
+    const walkInJobCards: Array<{ id: string; checklist: string[] }> = [];
+    for (const walkIn of demoWalkIns) {
+      const jobCard = await client.query<{ id: string }>(
+        `WITH updated AS (
+           UPDATE job_cards
+           SET primary_ticket_id = NULL,
+               assigned_to = $1,
+               created_by = $1,
+               description = $3,
+               category_id = categories.id,
+               department = $12,
+               priority = $5::ticket_priority,
+               location_id = locations.id,
+               location_details = $7,
+               station_reference = $8,
+               walk_in_reporter_name = $9,
+               walk_in_reporter_email = $10,
+               target_at = CURRENT_TIMESTAMP + ($11 * INTERVAL '1 hour'),
+               updated_at = CURRENT_TIMESTAMP
+           FROM categories, locations
+           WHERE job_cards.title = $2
+             AND job_cards.primary_ticket_id IS NULL
+             AND categories.name = $4
+             AND locations.name = $6
+           RETURNING job_cards.id
+         ),
+         inserted AS (
+           INSERT INTO job_cards (
+             primary_ticket_id, assigned_to, created_by, title, description,
+             category_id, priority, location_id, location_details,
+             station_reference, walk_in_reporter_name, walk_in_reporter_email, department,
+             target_at
+           )
+           SELECT
+             NULL, $1, $1, $2, $3, categories.id, $5::ticket_priority,
+             locations.id, $7, $8, $9, $10, $12,
+             CURRENT_TIMESTAMP + ($11 * INTERVAL '1 hour')
+           FROM categories, locations
+           WHERE categories.name = $4
+             AND locations.name = $6
+             AND NOT EXISTS (SELECT 1 FROM updated)
+           RETURNING id
          )
-         SELECT
-           NULL, $1, $1, 'Walk-in laptop Wi-Fi configuration',
-           'Configure the student laptop for secure campus Wi-Fi and verify access.',
-           categories.id, 'LOW', locations.id, 'CSIS help desk',
-           'Personal laptop', 'Thabo Molefe', 'thabo.molefe@mynwu.ac.za',
-           CURRENT_TIMESTAMP + INTERVAL '2 hours'
-         FROM categories, locations
-         WHERE categories.name = 'Network'
-           AND locations.name = 'Building G'
-           AND NOT EXISTS (SELECT 1 FROM updated)
-         RETURNING id
-       )
-       SELECT id FROM updated
-       UNION ALL
-       SELECT id FROM inserted
-       LIMIT 1`,
-      [technicianId],
-    );
+         SELECT id FROM updated
+         UNION ALL
+         SELECT id FROM inserted
+         LIMIT 1`,
+        [
+          technicianId,
+          walkIn.title,
+          walkIn.description,
+          walkIn.category,
+          walkIn.priority,
+          walkIn.location,
+          walkIn.locationDetails,
+          walkIn.stationReference,
+          walkIn.reporterName,
+          walkIn.reporterEmail,
+          walkIn.targetInHours,
+          walkIn.department,
+        ],
+      );
+      const id = jobCard.rows[0]?.id;
+      if (!id) throw new Error(`Could not seed walk-in job: ${walkIn.title}`);
+      walkInJobCards.push({ id, checklist: walkIn.checklist });
+    }
 
     for (const [jobCardId, items] of [
       [linkedJobCard.rows[0]?.id, ["Inspect projector input and cabling", "Test the lectern display output"]],
-      [walkInJobCard.rows[0]?.id, ["Configure secure Wi-Fi profile", "Confirm internet access with the requester"]],
+      ...walkInJobCards.map(({ id, checklist }) => [id, checklist] as const),
     ] as const) {
       if (!jobCardId) throw new Error("Could not seed demo job card");
       for (const [position, body] of items.entries()) {
@@ -607,6 +830,30 @@ async function main() {
     }
 
     await client.query(
+      `UPDATE job_cards AS jc
+       SET status = 'PAUSED', updated_at = CURRENT_TIMESTAMP
+       WHERE jc.primary_ticket_id = ANY($1::uuid[])
+         AND jc.status = 'LIVE'
+         AND NOT EXISTS (
+           SELECT 1 FROM time_entries AS te
+           WHERE te.stopped_at IS NULL
+             AND (
+               te.job_card_id = jc.id
+               OR (te.job_card_id IS NULL AND te.ticket_id = jc.primary_ticket_id)
+             )
+         )`,
+      [[...tickets.filter((ticket) => ticket.status === "IN_PROGRESS")
+        .map((ticket) => ticketIds.get(ticket.key))
+        .filter((id): id is string => Boolean(id))]],
+    );
+
+    // Older seed runs created synthetic outbox events. Remove them so restoring
+    // local demo data never sends sample ticket emails to demonstration users.
+    await client.query(
+      "DELETE FROM notification_outbox WHERE LEFT(event_type, 5) = 'DEMO_'",
+    );
+
+    await client.query(
       `INSERT INTO audit_events (actor_id, action, new_values)
        SELECT $1, 'DEMO_DATA_SEEDED', $2::jsonb
        WHERE NOT EXISTS (
@@ -616,7 +863,7 @@ async function main() {
     );
 
     await client.query("COMMIT");
-    console.log("Demo data ready: one account per role, eight workflow tickets, four linked calendar events, and linked plus walk-in job cards.");
+    console.log("Demo data ready: one account per role, eight workflow tickets, ticket-linked job cards, two walk-in jobs, and four ticket appointments.");
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;

@@ -66,6 +66,7 @@ portalRouter.get("/tickets/mine", async (request, response) => {
          tickets.description,
          tickets.priority,
          tickets.status,
+         tickets.department,
          tickets.location_details AS "locationDetails",
          tickets.station_reference AS "stationReference",
          tickets.resolution_summary AS "resolutionSummary",
@@ -123,6 +124,7 @@ portalRouter.get("/tickets/:ticketId", async (request, response) => {
          tickets.title,
          tickets.description,
          tickets.priority,
+         tickets.department,
          tickets.status,
          tickets.source,
          tickets.location_details AS "locationDetails",
@@ -310,11 +312,13 @@ portalRouter.post("/tickets/:ticketId/sub-issues", async (request, response) => 
     const parentResult = await client.query<{
       id: string; ticket_number: string; title: string; reporter_id: string;
       reporter_email: string; assigned_to: string | null; category_id: number;
+      department: string | null;
       location_id: number | null; location_details: string | null; status: string;
       parent_ticket_id: string | null; source: string;
     }>(
       `SELECT tickets.id, tickets.ticket_number, tickets.title, tickets.reporter_id,
               reporters.email AS reporter_email, tickets.assigned_to, tickets.category_id,
+              tickets.department,
               tickets.location_id, tickets.location_details, tickets.status,
               tickets.parent_ticket_id, tickets.source
        FROM tickets
@@ -367,21 +371,21 @@ portalRouter.post("/tickets/:ticketId/sub-issues", async (request, response) => 
       status: string; due_at: Date | null; created_at: Date;
     }>(
       `INSERT INTO tickets (
-         reporter_id, created_by, assigned_to, category_id, location_id,
+         reporter_id, created_by, assigned_to, category_id, department, location_id,
          location_details, title, description, priority, status, source,
          parent_ticket_id, due_at
        )
        VALUES (
-         $1, $2, $3, $4, $5,
-         $6, $7, $8, $9, $10, $11::ticket_source,
-         $12, $13
+         $1, $2, $3, $4, $5, $6,
+         $7, $8, $9, $10, $11, $12::ticket_source,
+         $13, $14
        )
        RETURNING id, ticket_number, title, priority, status, due_at, created_at`,
       [
         parent.reporter_id, user.id, input.assignedTo ?? null, categoryId,
-        parent.location_id, parent.location_details, input.title, input.description,
-        input.priority, input.assignedTo ? "ASSIGNED" : "NEW", parent.source,
-        parent.id, input.dueAt ?? null,
+        parent.department, parent.location_id, parent.location_details, input.title,
+        input.description, input.priority, input.assignedTo ? "ASSIGNED" : "NEW",
+        parent.source, parent.id, input.dueAt ?? null,
       ],
     );
     const child = childResult.rows[0];

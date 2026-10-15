@@ -15,6 +15,7 @@ export type TicketSummary = {
   category: string;
   priority: string;
   status: string;
+  department?: string | null;
   locationDetails: string | null;
   stationReference: string | null;
   createdAt: string;

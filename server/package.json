@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "npm run build && node --test --test-concurrency=1 dist/tests/ticket-started-notification.test.js dist/tests/auth-password-reset.test.js dist/tests/admin-user-delete.test.js dist/tests/audit-immutability.test.js",
+    "test": "npm run build && node --test --test-concurrency=1 dist/tests/ticket-started-notification.test.js dist/tests/auth-password-reset.test.js dist/tests/admin-user-delete.test.js dist/tests/audit-immutability.test.js dist/tests/job-card-auto-create.test.js dist/tests/job-card-timers.test.js",
     "dev": "tsx watch src/index.ts",
     "seed:dev": "npm run build && node dist/seed-dev-user.js",
     "build": "tsc",

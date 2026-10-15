@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { departments } from "@/lib/departments";
 
 type Option = { id: number; name: string };
 type Reporter = { id: string; fullName: string; email: string };
@@ -16,7 +17,6 @@ type FieldName = "reporterId" | "categoryId" | "priority" | "title" | "descripti
 export function CreateTicketDialog({ onCreated }: { onCreated: (ticket: TicketSummary) => void | Promise<void> }) {
   const [open, setOpen] = useState(false);
   const [categories, setCategories] = useState<Option[]>([]);
-  const [locations, setLocations] = useState<Option[]>([]);
   const [reporters, setReporters] = useState<Reporter[]>([]);
   const [reporterQuery, setReporterQuery] = useState("");
   const [reporterId, setReporterId] = useState("");
@@ -38,10 +38,10 @@ export function CreateTicketDialog({ onCreated }: { onCreated: (ticket: TicketSu
     if (!open) return;
     setLoading(true); setError("");
     void Promise.all([
-      api<{ categories: Option[]; locations: Option[] }>("/api/tickets/metadata"),
+      api<{ categories: Option[] }>("/api/tickets/metadata"),
       api<{ reporters: Reporter[] }>("/api/technician/reporters"),
     ]).then(([metadata, reporterData]) => {
-      setCategories(metadata.categories); setLocations(metadata.locations); setReporters(reporterData.reporters);
+      setCategories(metadata.categories); setReporters(reporterData.reporters);
     }).catch((caught) => setError(caught instanceof Error ? caught.message : "Could not load ticket options"))
       .finally(() => setLoading(false));
   }, [open]);
@@ -67,7 +67,7 @@ export function CreateTicketDialog({ onCreated }: { onCreated: (ticket: TicketSu
     try {
       const result = await api<{ ticket: TicketSummary }>("/api/technician/manual-tickets", { method: "POST", body: JSON.stringify({
         reporterId, categoryId: Number(categoryId),
-        locationId: data.get("locationId") ? Number(data.get("locationId")) : null,
+        department: String(data.get("department") ?? "") || null,
         locationDetails: String(data.get("locationDetails") ?? ""), stationReference: String(data.get("stationReference") ?? ""),
         title, description, priority: physicalHazard ? "CRITICAL" : priority,
       }) });
@@ -88,8 +88,8 @@ export function CreateTicketDialog({ onCreated }: { onCreated: (ticket: TicketSu
         <Field label="Category" htmlFor="new-category"><select id="new-category" value={categoryId} onChange={(event) => { setCategoryId(event.target.value); clearError("categoryId"); }} className={selectClasses} aria-invalid={Boolean(fieldErrors.categoryId)}><option value="">Select a category</option>{categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><FieldError message={fieldErrors.categoryId} /></Field>
         <Field label="Priority" htmlFor="new-priority"><select id="new-priority" value={priority} onChange={(event) => { setPriority(event.target.value); clearError("priority"); }} className={selectClasses} disabled={physicalHazard} aria-invalid={Boolean(fieldErrors.priority)}><option value="">Select a priority</option><option value="LOW">Low</option><option value="MEDIUM">Medium</option><option value="HIGH">High</option><option value="CRITICAL">Critical</option></select><FieldError message={fieldErrors.priority} /></Field>
         {physicalHazard && <div className="flex gap-3 rounded-lg bg-red-50 p-3 text-sm text-red-800 sm:col-span-2"><ShieldAlert className="mt-0.5 size-5 shrink-0" /><p>Priority is Critical. If there is burning, exposed wiring, or an electrical hazard, switch off equipment only if safe, keep people away, and contact emergency or facilities support immediately.</p></div>}
-        <Field label="Campus location" htmlFor="new-location"><select id="new-location" name="locationId" className={selectClasses} defaultValue=""><option value="">Select a known location</option>{locations.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
-        <Field label="Location details" htmlFor="new-location-details"><Input id="new-location-details" name="locationDetails" placeholder="For example: Lab G14" maxLength={200} /></Field>
+        <Field label="Department" htmlFor="new-department"><select id="new-department" name="department" className={selectClasses} defaultValue=""><option value="">Select department</option>{departments.map((department) => <option key={department} value={department}>{department}</option>)}</select></Field>
+        <Field label="Building, room, or area" htmlFor="new-location-details"><Input id="new-location-details" name="locationDetails" placeholder="For example: Lab G14" maxLength={200} /></Field>
         <Field label="Station or asset ID" htmlFor="new-station"><Input id="new-station" name="stationReference" placeholder="For example: Station 12" maxLength={50} /></Field><div className="hidden sm:block" />
         <div className="space-y-2 sm:col-span-2"><Label htmlFor="new-title">Issue summary</Label><Input id="new-title" name="title" maxLength={160} onChange={() => clearError("title")} aria-invalid={Boolean(fieldErrors.title)} /><FieldError message={fieldErrors.title} /></div>
         <div className="space-y-2 sm:col-span-2"><Label htmlFor="new-description">Detailed issue description</Label><Textarea id="new-description" name="description" className="min-h-28" maxLength={4000} onChange={() => clearError("description")} aria-invalid={Boolean(fieldErrors.description)} /><FieldError message={fieldErrors.description} /></div>

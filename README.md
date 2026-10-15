@@ -37,6 +37,10 @@ Get-Content -LiteralPath ".\server\db\migrations\008_email_verification.sql" -Ra
 Get-Content -LiteralPath ".\server\db\migrations\009_immutable_audit_events.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
 Get-Content -LiteralPath ".\server\db\migrations\010_job_card_escalation.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
 Get-Content -LiteralPath ".\server\db\migrations\011_user_account_tombstones.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
+Get-Content -LiteralPath ".\server\db\migrations\012_assigned_ticket_job_cards.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
+Get-Content -LiteralPath ".\server\db\migrations\013_reconcile_job_card_timers.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
+Get-Content -LiteralPath ".\server\db\migrations\014_multiple_active_technician_timers.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
+Get-Content -LiteralPath ".\server\db\migrations\015_ticket_job_card_departments.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
 npm --prefix server run seed-demo
 ```
 
@@ -100,12 +104,16 @@ days so the dashboard, queues, escalation flow and historical reporting all
 have representative data. The seed validates this status and age coverage
 before writing anything to the database.
 
-It also creates two job cards for Sebastian Klopper: one linked to the Lab G14
-projector ticket and one manually captured walk-in Wi-Fi job. In **Job cards →
+The six assigned tickets also receive linked job cards automatically. The seed
+adds a projector assessment linked to the Lab G14 ticket and two manually
+captured walk-in jobs for Wi-Fi and staff account access. In **Job cards →
 Create job card**, choosing a ticket copies its requester, title, description,
 technician, category, priority, location and station into the form. Leave
 **Linked ticket** set to **No ticket — manual walk-in job** to record a walk-in
 request directly; enter the requester's name and the job details manually.
+Tickets assigned to a technician also receive a linked job card automatically.
+Migration 012 creates cards for existing assignments; future assignments create
+or reassign their linked card automatically.
 
 The same seed creates four upcoming service calendar events linked to the
 projector, portal access, Lab G30 Wi-Fi and Building G network tickets. Open
@@ -185,7 +193,7 @@ and does not create a session. Links expire in 24 hours and are single-use;
 users can request another from **Resend verification email** on the sign-in page.
 Password resets do not bypass email verification.
 
-Apply migrations 006 through 011 after the earlier migrations, before starting
+Apply migrations 006 through 015 after the earlier migrations, before starting
 the updated server. Apply 008 once: it preserves access for existing accounts.
 New accounts default to unverified. Development seeds and the system-admin
 bootstrap explicitly provision trusted accounts with access.
@@ -197,6 +205,10 @@ Get-Content -LiteralPath ".\server\db\migrations\008_email_verification.sql" -Ra
 Get-Content -LiteralPath ".\server\db\migrations\009_immutable_audit_events.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
 Get-Content -LiteralPath ".\server\db\migrations\010_job_card_escalation.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
 Get-Content -LiteralPath ".\server\db\migrations\011_user_account_tombstones.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
+Get-Content -LiteralPath ".\server\db\migrations\012_assigned_ticket_job_cards.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
+Get-Content -LiteralPath ".\server\db\migrations\013_reconcile_job_card_timers.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
+Get-Content -LiteralPath ".\server\db\migrations\014_multiple_active_technician_timers.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
+Get-Content -LiteralPath ".\server\db\migrations\015_ticket_job_card_departments.sql" -Raw | docker compose exec -T db psql -v ON_ERROR_STOP=1 -U csis_dev -d csis_ticketing
 ```
 
 Set `APP_BASE_URL` to the externally accessible frontend URL and configure

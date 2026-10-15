@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { departments } from "@/lib/departments";
 
 type Category = {
   id: number;
@@ -26,6 +27,7 @@ type Ticket = {
   category: string;
   priority: string;
   status: string;
+  department: string | null;
   locationDetails: string | null;
   stationReference: string | null;
   createdAt: string;
@@ -91,6 +93,7 @@ export function ReporterDashboard() {
         },
         body: JSON.stringify({
           categoryId: Number(formData.get("categoryId")),
+          department: String(formData.get("department") ?? "") || null,
           locationDetails: String(formData.get("locationDetails") ?? ""),
           stationReference: String(formData.get("stationReference") ?? ""),
           title: String(formData.get("title") ?? ""),
@@ -166,6 +169,21 @@ export function ReporterDashboard() {
                 <option value="MEDIUM">Medium</option>
                 <option value="HIGH">High</option>
                 <option value="CRITICAL">Critical or hazardous</option>
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="department">Department</Label>
+              <select
+                id="department"
+                name="department"
+                className={selectClasses}
+                defaultValue=""
+              >
+                <option value="">Select department</option>
+                {departments.map((department) => (
+                  <option key={department} value={department}>{department}</option>
+                ))}
               </select>
             </div>
 
@@ -317,6 +335,7 @@ export function ReporterDashboard() {
                   </div>
 
                   <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted-foreground">
+                    {ticket.department && <span>Department: {ticket.department}</span>}
                     {ticket.locationDetails && (
                       <span>{ticket.locationDetails}</span>
                     )}

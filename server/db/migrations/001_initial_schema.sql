@@ -113,6 +113,7 @@ CREATE TABLE IF NOT EXISTS tickets (
 
   category_id INTEGER NOT NULL REFERENCES categories(id),
   location_id INTEGER REFERENCES locations(id),
+  department TEXT CHECK (department IS NULL OR department IN ('CSIS', 'Statistics', 'Mathematics')),
 
   location_details TEXT,
   station_reference TEXT,

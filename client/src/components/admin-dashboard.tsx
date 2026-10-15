@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { Activity, AlertTriangle, BarChart3, CalendarRange, ChevronDown, DatabaseBackup, Download, Eye, GitBranch, LoaderCircle, Mail, Plus, RefreshCw, Search, ShieldCheck, TicketCheck, Timer, Trash2, UserCog } from "lucide-react";
+import { Activity, AlertTriangle, BarChart3, CalendarRange, Check, ChevronDown, DatabaseBackup, Download, Eye, GitBranch, LoaderCircle, Mail, Plus, RefreshCw, Search, ShieldCheck, TicketCheck, Timer, Trash2, UserCog } from "lucide-react";
 
 import { api, formatDuration, formatValue, relativeTime } from "@/lib/api";
 import type { PortalSection, User, UserRole } from "@/types";
@@ -316,16 +316,192 @@ function TimelineLineChart({ data, periodDays }: { data: Array<{ label: string; 
 }
 
 function TicketAdministration({ role }: { role: UserRole }) {
-  const [tickets, setTickets] = useState<AdminTicket[]>([]); const [search, setSearch] = useState(""); const [status, setStatus] = useState("ALL"); const [priority, setPriority] = useState("ALL"); const [loading, setLoading] = useState(true); const [error, setError] = useState(""); const [message, setMessage] = useState(""); const [selected, setSelected] = useState<string | null>(null);
-  const load = useCallback(async () => { setLoading(true); setError(""); try { const params = new URLSearchParams({ search, status, priority }); setTickets((await api<{ tickets: AdminTicket[] }>(`/api/admin/tickets?${params}`)).tickets); } catch (caught) { setError(caught instanceof Error ? caught.message : "Could not load tickets"); } finally { setLoading(false); } }, [priority, search, status]);
-  useEffect(() => { const timer = window.setTimeout(() => void load(), 200); return () => window.clearTimeout(timer); }, [load]);
-  return <div className="space-y-6"><div className="flex flex-wrap items-center justify-between gap-4"><div className="pb-4"><h1 className="text-2xl font-semibold tracking-tight">All tickets</h1></div><CreateTicketDialog onCreated={async (ticket) => { setMessage(`${ticket.ticketNumber} was created and added to the ticket queue.`); await load(); }} /></div>
-    {message && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700" role="status">{message}</p>}
-    <Card><CardHeader><div className="grid gap-3 md:grid-cols-[1fr_190px_190px_auto]"><label className="relative"><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input value={search} onChange={(event) => setSearch(event.target.value)} className="pl-9" placeholder="Ticket, requester or email" /></label><Filter value={status} onChange={setStatus} allLabel="All statuses" values={["NEW","ASSIGNED","IN_PROGRESS","AWAITING_FEEDBACK","ESCALATED","RESOLVED"]} /><Filter value={priority} onChange={setPriority} allLabel="All priorities" values={["CRITICAL","HIGH","MEDIUM","LOW"]} /><Button variant="outline" onClick={() => void load()}><RefreshCw className={loading ? "animate-spin" : ""} /> Refresh</Button></div></CardHeader><CardContent>{error && <ErrorMessage>{error}</ErrorMessage>}{loading && tickets.length === 0 ? <LoadingPanel label="Loading tickets" /> : <ResponsiveTable headings={["Ticket","Requester","Category","Priority","Status","Assigned","Created",""]}>{tickets.map((ticket) => <tr key={ticket.id} className="border-t"><td className="px-4 py-3"><p className="font-semibold text-[#4B2C70]">{ticket.ticketNumber}</p><p className="max-w-56 truncate text-sm">{ticket.title}</p></td><td className="px-4 py-3"><p>{ticket.reporterName}</p><p className="text-xs text-muted-foreground">{ticket.reporterEmail}</p></td><td className="px-4 py-3">{ticket.category}</td><td className="px-4 py-3"><Priority priority={ticket.priority} /></td><td className="px-4 py-3"><Badge variant="secondary">{formatValue(ticket.status)}</Badge></td><td className="px-4 py-3">{ticket.technicianName ?? "Unassigned"}</td><td className="px-4 py-3 text-sm">{relativeTime(ticket.createdAt)}</td><td className="px-4 py-3"><Button size="icon" variant="ghost" aria-label={`View ${ticket.ticketNumber}`} onClick={() => setSelected(ticket.id)}><Eye /></Button></td></tr>)}</ResponsiveTable>}</CardContent></Card>
-    <TicketDetailDialog ticketId={selected} open={selected !== null} role={role} onOpenChange={(open) => !open && setSelected(null)} onChanged={load} />
-  </div>;
+  const [tickets, setTickets] = useState<AdminTicket[]>([]);
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("ALL");
+  const [priority, setPriority] = useState("ALL");
+  const [category, setCategory] = useState("ALL");
+  const [assignee, setAssignee] = useState("ALL");
+  const [createdRange, setCreatedRange] = useState("ALL");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [selected, setSelected] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const params = new URLSearchParams({ search });
+      setTickets((await api<{ tickets: AdminTicket[] }>("/api/admin/tickets?" + params)).tickets);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not load tickets");
+    } finally {
+      setLoading(false);
+    }
+  }, [search]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => void load(), 200);
+    return () => window.clearTimeout(timer);
+  }, [load]);
+
+  const categories = Array.from(new Set(tickets.map((ticket) => ticket.category))).sort((a, b) => a.localeCompare(b));
+  const assignees = Array.from(new Set(tickets.map((ticket) => ticket.technicianName).filter((name): name is string => Boolean(name)))).sort((a, b) => a.localeCompare(b));
+  const filteredTickets = tickets.filter((ticket) => {
+    if (status !== "ALL" && ticket.status !== status) return false;
+    if (priority !== "ALL" && ticket.priority !== priority) return false;
+    if (category !== "ALL" && ticket.category !== category) return false;
+    if (assignee !== "ALL" && (assignee === "__UNASSIGNED__" ? ticket.technicianName !== null : ticket.technicianName !== assignee)) return false;
+    if (createdRange !== "ALL") {
+      const age = Date.now() - new Date(ticket.createdAt).getTime();
+      const cutoffDays = Number(createdRange);
+      if (createdRange === "OLDER" ? age < 90 * 24 * 60 * 60 * 1000 : age > cutoffDays * 24 * 60 * 60 * 1000) return false;
+    }
+    return true;
+  });
+
+  const statusOptions = ["NEW", "ASSIGNED", "IN_PROGRESS", "AWAITING_FEEDBACK", "ESCALATED", "RESOLVED"];
+  const priorityOptions = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="pb-4">
+          <h1 className="text-2xl font-semibold tracking-tight">All tickets</h1>
+        </div>
+        <CreateTicketDialog onCreated={async (ticket) => {
+          setMessage(ticket.ticketNumber + " was created and added to the ticket queue.");
+          await load();
+        }} />
+      </div>
+      {message && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700" role="status">{message}</p>}
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <label className="relative min-w-0 flex-1">
+              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input value={search} onChange={(event) => setSearch(event.target.value)} className="pl-9" placeholder="Ticket, requester or email" />
+            </label>
+            <Button variant="outline" onClick={() => void load()} disabled={loading}>
+              <RefreshCw className={loading ? "animate-spin" : ""} /> Refresh
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {error && <ErrorMessage>{error}</ErrorMessage>}
+          {loading && tickets.length === 0 ? <LoadingPanel label="Loading tickets" /> : (
+            <ResponsiveTable
+              headings={[
+                "Ticket",
+                <span className="sr-only">Ticket details</span>,
+                "Requester",
+                <TicketFilterHeading
+                  label="Category"
+                  value={category}
+                  options={[{ value: "ALL", label: "All categories" }, ...categories.map((value) => ({ value, label: formatValue(value) }))]}
+                  onChange={setCategory}
+                />,
+                <TicketFilterHeading
+                  label="Priority"
+                  value={priority}
+                  options={[{ value: "ALL", label: "All priorities" }, ...priorityOptions.map((value) => ({ value, label: formatValue(value) }))]}
+                  onChange={setPriority}
+                />,
+                <TicketFilterHeading
+                  label="Status"
+                  value={status}
+                  options={[{ value: "ALL", label: "All statuses" }, ...statusOptions.map((value) => ({ value, label: formatValue(value) }))]}
+                  onChange={setStatus}
+                />,
+                <TicketFilterHeading
+                  label="Assigned"
+                  value={assignee}
+                  options={[{ value: "ALL", label: "All assignees" }, { value: "__UNASSIGNED__", label: "Unassigned" }, ...assignees.map((value) => ({ value, label: value }))]}
+                  onChange={setAssignee}
+                />,
+                <TicketFilterHeading
+                  label="Created"
+                  value={createdRange}
+                  options={[
+                    { value: "ALL", label: "Any time" },
+                    { value: "7", label: "Last 7 days" },
+                    { value: "30", label: "Last 30 days" },
+                    { value: "90", label: "Last 90 days" },
+                    { value: "OLDER", label: "Older than 90 days" },
+                  ]}
+                  onChange={setCreatedRange}
+                />,
+              ]}
+              tableClassName="table-fixed md:min-w-0"
+              columnWidths={["16%", "4%", "25%", "12%", "10%", "10%", "15%", "8%"]}
+              compact
+            >
+              {filteredTickets.map((ticket) => (
+                <tr key={ticket.id} className="border-t">
+                  <td className="max-w-0 px-2 py-3">
+                    <p className="truncate font-semibold text-[#4B2C70]" title={ticket.ticketNumber}>{ticket.ticketNumber}</p>
+                    <p className="truncate text-sm" title={ticket.title}>{ticket.title}</p>
+                  </td>
+                  <td className="px-1 py-3">
+                    <Button size="icon" variant="ghost" className="size-8" aria-label={"View " + ticket.ticketNumber} onClick={() => setSelected(ticket.id)}>
+                      <Eye />
+                    </Button>
+                  </td>
+                  <td className="max-w-0 px-2 py-3">
+                    <p className="truncate" title={ticket.reporterName}>{ticket.reporterName}</p>
+                    <p className="truncate text-xs text-muted-foreground" title={ticket.reporterEmail}>{ticket.reporterEmail}</p>
+                  </td>
+                  <td className="max-w-0 truncate px-2 py-3" title={formatValue(ticket.category)}>{formatValue(ticket.category)}</td>
+                  <td className="px-2 py-3"><Priority priority={ticket.priority} /></td>
+                  <td className="px-2 py-3"><Badge variant="secondary">{formatValue(ticket.status)}</Badge></td>
+                  <td className="max-w-0 truncate px-2 py-3" title={ticket.technicianName ?? "Unassigned"}>{ticket.technicianName ?? "Unassigned"}</td>
+                  <td className="whitespace-nowrap px-2 py-3 text-xs">{relativeTime(ticket.createdAt)}</td>
+                </tr>
+              ))}
+            </ResponsiveTable>
+          )}
+        </CardContent>
+      </Card>
+      <TicketDetailDialog ticketId={selected} open={selected !== null} role={role} onOpenChange={(open) => !open && setSelected(null)} onChanged={load} />
+    </div>
+  );
 }
 
+function TicketFilterHeading({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: Array<{ value: string; label: string }>;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger render={
+        <button
+          type="button"
+          aria-label={"Filter by " + label}
+          className={"inline-flex items-center gap-1 text-left hover:text-[#4B2C70] focus-visible:rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#4B2C70] " + (value !== "ALL" ? "text-[#4B2C70]" : "")}
+        >
+          {label}
+          <ChevronDown className="size-3.5 shrink-0" aria-hidden="true" />
+        </button>
+      } />
+      <DropdownMenuContent align="start" className="max-h-72 min-w-44 overflow-y-auto p-1">
+        {options.map((option) => (
+          <DropdownMenuItem key={option.value} onClick={() => onChange(option.value)} className="flex w-full justify-start gap-2 whitespace-nowrap">
+            <span className="inline-flex size-4 shrink-0 items-center justify-center">{value === option.value && <Check className="size-3.5" />}</span>
+            {option.label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 function UserAdministration({ currentUser }: { currentUser: User }) {
   const [deleteTarget, setDeleteTarget] = useState<ManagedUser | null>(null);
   const [deleteStep, setDeleteStep] = useState<"review" | "final" | null>(null);
@@ -604,9 +780,36 @@ function EmptyReport() { return <p className="rounded-xl border border-dashed p-
 function LoadingPanel({ label }: { label: string }) { return <div className="flex min-h-56 items-center justify-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="animate-spin" /> {label}</div>; }
 function ErrorMessage({ children }: { children: ReactNode }) { return <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{children}</p>; }
 function Field({ label, children }: { label: string; children: ReactNode }) { return <div className="space-y-2"><Label>{label}</Label>{children}</div>; }
-function ResponsiveTable({ headings, children }: { headings: string[]; children: ReactNode }) { return <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left"><thead><tr className="bg-slate-50 text-xs uppercase tracking-wide text-muted-foreground">{headings.map((heading, index) => <th key={`${heading}-${index}`} className="px-4 py-3 font-medium">{heading}</th>)}</tr></thead><tbody>{children}</tbody></table></div>; }
+function ResponsiveTable({
+  headings,
+  children,
+  tableClassName = "",
+  columnWidths,
+  compact = false,
+}: {
+  headings: ReactNode[];
+  children: ReactNode;
+  tableClassName?: string;
+  columnWidths?: string[];
+  compact?: boolean;
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <table className={"w-full min-w-[760px] text-left " + tableClassName}>
+        {columnWidths && <colgroup>{columnWidths.map((width, index) => <col key={index} style={{ width }} />)}</colgroup>}
+        <thead>
+          <tr className="bg-slate-50 text-xs uppercase tracking-wide text-muted-foreground">
+            {headings.map((heading, index) => (
+              <th key={index} className={(compact ? "px-2 md:px-3" : "px-4") + " py-3 font-medium"}>{heading}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>{children}</tbody>
+      </table>
+    </div>
+  );
+}
 function Priority({ priority }: { priority: string }) { return <Badge className={priority === "CRITICAL" ? "bg-red-100 text-red-800" : priority === "HIGH" ? "bg-orange-100 text-orange-800" : "bg-slate-100 text-slate-700"}>{formatValue(priority)}</Badge>; }
-function Filter({ value, onChange, allLabel, values }: { value: string; onChange: (value: string) => void; allLabel: string; values: string[] }) { return <select value={value} onChange={(event) => onChange(event.target.value)} className={selectClasses} aria-label={allLabel}><option value="ALL">{allLabel}</option>{values.map((item) => <option key={item} value={item}>{formatValue(item)}</option>)}</select>; }
 function summariseChange(value: Record<string, unknown> | null) { if (!value) return "—"; return Object.entries(value).slice(0, 4).map(([key, item]) => `${formatValue(key)}: ${String(item)}`).join(" · "); }
 function download(url: string) { const anchor = document.createElement("a"); anchor.href = url; anchor.download = ""; document.body.appendChild(anchor); anchor.click(); anchor.remove(); }
 function ReportDownloadItem({ title, description, loading, onClick }: { title: string; description: string; loading: boolean; onClick: () => void }) {

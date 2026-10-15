@@ -7,6 +7,8 @@ import {
   type AuthenticatedRequest,
 } from "../middleware/require-auth.js";
 import { z } from "zod";
+import { departments } from "../domain/departments.js";
+import { startOrSwitchJobTimer } from "../services/job-timers.js";
 import { enqueueTicketStarted } from "../services/notification-outbox.js";
 export const technicianRouter = Router();
 
@@ -45,6 +47,7 @@ const updateStatusSchema = z
 const manualTicketSchema = z.object({
   reporterId: z.string().uuid(),
   categoryId: z.number().int().positive(),
+  department: z.enum(departments).nullable().optional(),
   locationId: z.number().int().positive().nullable().optional(),
   locationDetails: z.string().trim().max(200).optional(),
   stationReference: z.string().trim().max(50).optional(),
@@ -68,6 +71,7 @@ technicianRouter.get("/queue", async (_request, response) => {
          tickets.description,
          tickets.priority,
          tickets.status,
+         tickets.department,
          tickets.location_details AS "locationDetails",
          tickets.station_reference AS "stationReference",
          tickets.due_at AS "dueAt",
@@ -276,15 +280,20 @@ technicianRouter.post(
         return;
       }
 
-      const timerResult = await client.query<{
-        id: string;
-        started_at: Date;
-      }>(
-        `INSERT INTO time_entries (ticket_id, technician_id)
-         VALUES ($1, $2)
-         RETURNING id, started_at`,
-        [ticket.id, user.id],
+      const linkedCard = await client.query<{ id: string }>(
+        `SELECT id FROM job_cards
+         WHERE primary_ticket_id = $1
+           AND status NOT IN ('COMPLETED', 'CANCELLED')
+         ORDER BY created_at
+         LIMIT 1
+         FOR UPDATE`,
+        [ticket.id],
       );
+      const timer = await startOrSwitchJobTimer(client, {
+        ticketId: ticket.id,
+        technicianId: user.id,
+        jobCardId: linkedCard.rows[0]?.id ?? null,
+      });
 
       await client.query(
         `UPDATE tickets
@@ -295,23 +304,25 @@ technicianRouter.post(
         [ticket.id],
       );
 
-      await client.query(
-        `INSERT INTO audit_events (
-           ticket_id,
-           actor_id,
-           action,
-           new_values
-         )
-         VALUES ($1, $2, 'TIMER_STARTED', $3::jsonb)`,
-        [
-          ticket.id,
-          user.id,
-          JSON.stringify({
-            timeEntryId: timerResult.rows[0].id,
-            startedAt: timerResult.rows[0].started_at,
-          }),
-        ],
-      );
+      if (!timer.alreadyRunning) {
+        await client.query(
+          `INSERT INTO audit_events (
+             ticket_id,
+             actor_id,
+             action,
+             new_values
+           )
+           VALUES ($1, $2, 'TIMER_STARTED', $3::jsonb)`,
+          [
+            ticket.id,
+            user.id,
+            JSON.stringify({
+              timeEntryId: timer.id,
+              startedAt: timer.startedAt,
+            }),
+          ],
+        );
+      }
 
       if (ticket.status !== "IN_PROGRESS") {
         await enqueueTicketStarted(client, {
@@ -320,16 +331,16 @@ technicianRouter.post(
           ticketNumber: ticket.ticket_number,
           ticketTitle: ticket.title,
           technicianName: user.fullName,
-          startedAt: timerResult.rows[0].started_at,
+          startedAt: timer.startedAt,
         });
       }
 
       await client.query("COMMIT");
 
-      response.status(201).json({
+      response.status(timer.alreadyRunning ? 200 : 201).json({
         timer: {
-          id: timerResult.rows[0].id,
-          startedAt: timerResult.rows[0].started_at,
+          id: timer.id,
+          startedAt: timer.startedAt,
         },
       });
     } catch (error) {
@@ -337,7 +348,7 @@ technicianRouter.post(
 
       if ((error as { code?: string }).code === "23505") {
         response.status(409).json({
-          error: "You already have an active job-card timer",
+          error: "This ticket already has an active timer",
         });
         return;
       }
@@ -362,8 +373,9 @@ technicianRouter.post(
 
       const activeTimer = await client.query<{
         id: string;
+        job_card_id: string | null;
       }>(
-        `SELECT id
+        `SELECT id, job_card_id
          FROM time_entries
          WHERE ticket_id = $1
            AND technician_id = $2
@@ -409,6 +421,14 @@ technicianRouter.post(
          SET updated_at = CURRENT_TIMESTAMP
          WHERE id = $1`,
         [ticketId],
+      );
+
+      await client.query(
+        `UPDATE job_cards
+         SET status = 'PAUSED', updated_at = CURRENT_TIMESTAMP
+         WHERE status = 'LIVE'
+           AND (id = $1 OR primary_ticket_id = $2)`,
+        [timer.job_card_id, ticketId],
       );
 
       await client.query(
@@ -786,6 +806,7 @@ technicianRouter.post("/manual-tickets", async (request, response) => {
       id: string;
       ticket_number: string;
       title: string;
+      department: string | null;
       priority: string;
       status: string;
       created_at: Date;
@@ -794,6 +815,7 @@ technicianRouter.post("/manual-tickets", async (request, response) => {
          reporter_id,
          created_by,
          category_id,
+         department,
          location_id,
          location_details,
          station_reference,
@@ -802,12 +824,13 @@ technicianRouter.post("/manual-tickets", async (request, response) => {
          priority,
          source
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'WALK_IN')
-       RETURNING id, ticket_number, title, priority, status, created_at`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'WALK_IN')
+       RETURNING id, ticket_number, title, department, priority, status, created_at`,
       [
         reporter.id,
         user.id,
         input.categoryId,
+        input.department ?? null,
         input.locationId ?? null,
         input.locationDetails || null,
         input.stationReference || null,
@@ -860,6 +883,7 @@ technicianRouter.post("/manual-tickets", async (request, response) => {
         id: ticket.id,
         ticketNumber: ticket.ticket_number,
         title: ticket.title,
+        department: ticket.department,
         priority: ticket.priority,
         status: ticket.status,
         createdAt: ticket.created_at,

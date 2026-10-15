@@ -39,6 +39,7 @@ type QueueTicket = {
   category: string;
   priority: string;
   status: string;
+  department: string | null;
   locationDetails: string | null;
   stationReference: string | null;
   dueAt: string | null;
@@ -413,6 +414,11 @@ export function TechnicianDashboard({ userId, userRole }: { userId: string; user
                               .filter(Boolean)
                               .join(" · ")}
                           </span>
+                        </div>
+                      )}
+                      {ticket.department && (
+                        <div className="text-sm">
+                          <span className="font-medium">Department:</span> {ticket.department}
                         </div>
                       )}
 

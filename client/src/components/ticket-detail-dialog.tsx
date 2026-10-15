@@ -27,6 +27,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { DateTimePicker } from "@/components/date-time-picker";
 
 type TicketDetailResponse = {
   ticket: {
@@ -38,6 +39,7 @@ type TicketDetailResponse = {
     priority: string;
     status: string;
     source: string;
+    department: string | null;
     locationDetails: string | null;
     stationReference: string | null;
     resolutionSummary: string | null;
@@ -294,6 +296,10 @@ export function TicketDetailDialog({
                   <dd className="mt-1">{detail.ticket.technicianName ?? "Not assigned"}</dd>
                 </div>
                 <div>
+                  <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Department</dt>
+                  <dd className="mt-1">{detail.ticket.department ?? "Not specified"}</dd>
+                </div>
+                <div>
                   <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Location</dt>
                   <dd className="mt-1">
                     {[detail.ticket.locationDetails, detail.ticket.stationReference].filter(Boolean).join(" · ") || "Not provided"}
@@ -340,7 +346,7 @@ export function TicketDetailDialog({
                       <Field label="Category"><select name="categoryId" className={selectClasses} defaultValue={subIssueOptions.categories.find((category) => category.name === detail.ticket.category)?.id}>{subIssueOptions.categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></Field>
                       <Field label="Priority"><select name="priority" className={selectClasses} defaultValue={detail.ticket.priority}><option value="LOW">Low</option><option value="MEDIUM">Medium</option><option value="HIGH">High</option><option value="CRITICAL">Critical</option></select></Field>
                       <Field label="Assign technician"><select name="assignedTo" className={selectClasses}><option value="">Leave unassigned</option>{subIssueOptions.technicians.map((technician) => <option key={technician.id} value={technician.id}>{technician.fullName}</option>)}</select></Field>
-                      <Field label="Target date"><Input name="dueAt" type="datetime-local" /></Field>
+                      <Field label="Target date"><DateTimePicker label="Target date and time" name="dueAt" /></Field>
                     </div>
                     <div className="mt-4 flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setShowSubIssueForm(false)} disabled={creatingSubIssue}>Cancel</Button><Button type="submit" className="bg-[#4B2C70] text-white" disabled={creatingSubIssue}>{creatingSubIssue ? <LoaderCircle className="animate-spin" /> : <GitBranch />}{creatingSubIssue ? "Creating..." : "Create sub-issue"}</Button></div>
                   </form>

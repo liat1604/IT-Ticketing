@@ -19,13 +19,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { departments, type Department } from "@/lib/departments";
 
 type Category = { id: number; name: string };
-type Location = { id: number; name: string };
 
 export function ReporterPortal({ section }: { section: PortalSection }) {
   const [categories, setCategories] = useState<Category[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
   const [tickets, setTickets] = useState<TicketSummary[]>([]);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -49,11 +48,10 @@ export function ReporterPortal({ section }: { section: PortalSection }) {
 
     try {
       const [metadata, ticketData] = await Promise.all([
-        api<{ categories: Category[]; locations: Location[] }>("/api/tickets/metadata"),
+        api<{ categories: Category[] }>("/api/tickets/metadata"),
         api<{ tickets: TicketSummary[] }>("/api/portal/tickets/mine"),
       ]);
       setCategories(metadata.categories);
-      setLocations(metadata.locations);
       setTickets(ticketData.tickets);
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : "Could not load your tickets");
@@ -79,7 +77,7 @@ export function ReporterPortal({ section }: { section: PortalSection }) {
         method: "POST",
         body: JSON.stringify({
           categoryId: Number(formData.get("categoryId")),
-          locationId: formData.get("locationId") ? Number(formData.get("locationId")) : null,
+          department: String(formData.get("department") ?? "") || null,
           locationDetails: String(formData.get("locationDetails") ?? ""),
           stationReference: String(formData.get("stationReference") ?? ""),
           title: String(formData.get("title") ?? ""),
@@ -133,7 +131,7 @@ export function ReporterPortal({ section }: { section: PortalSection }) {
             <CardContent>
               <TicketForm
                 categories={categories}
-                locations={locations}
+                departments={departments}
                 submitting={submitting}
                 onSubmit={createTicket}
                 categoryId={selectedCategoryId}
@@ -204,7 +202,7 @@ export function ReporterPortal({ section }: { section: PortalSection }) {
 
 function TicketForm({
   categories,
-  locations,
+  departments: departmentOptions,
   submitting,
   onSubmit,
   categoryId,
@@ -214,7 +212,7 @@ function TicketForm({
   physicalHazard,
 }: {
   categories: Category[];
-  locations: Location[];
+  departments: readonly Department[];
   submitting: boolean;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   categoryId: string;
@@ -242,15 +240,15 @@ function TicketForm({
         </select>
       </div>
       <div className="space-y-2">
-        <Label htmlFor="locationId">Campus location</Label>
-        <select id="locationId" name="locationId" className={selectClasses} defaultValue="">
-          <option value="">Select a known location</option>
-          {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
+        <Label htmlFor="department">Department</Label>
+        <select id="department" name="department" className={selectClasses} defaultValue="">
+          <option value="">Select department</option>
+          {departmentOptions.map((department) => <option key={department} value={department}>{department}</option>)}
         </select>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
         <div className="space-y-2">
-          <Label htmlFor="locationDetails">Location details</Label>
+          <Label htmlFor="locationDetails">Building, room, or area</Label>
           <Input id="locationDetails" name="locationDetails" placeholder="For example: Lab G14" maxLength={200} />
         </div>
         <div className="space-y-2">
@@ -306,6 +304,7 @@ function TicketList({ tickets, loading, onOpen }: { tickets: TicketSummary[]; lo
           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <Badge variant="outline">{ticket.category}</Badge>
             <PriorityBadge priority={ticket.priority} />
+            {ticket.department && <Badge variant="outline">{ticket.department}</Badge>}
             {ticket.commentCount ? <span className="flex items-center gap-1"><MessageSquare className="size-3.5" />{ticket.commentCount}</span> : null}
             <span>{relativeTime(ticket.createdAt)}</span>
             {ticket.technicianName && <span>Assigned to {ticket.technicianName}</span>}

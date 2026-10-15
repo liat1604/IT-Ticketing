@@ -2,12 +2,14 @@ import { Router } from "express";
 import { z } from "zod";
 
 import { pool } from "../db.js";
+import { departments } from "../domain/departments.js";
 import {
   requireAuth,
   requireRole,
   type AuthenticatedRequest,
   type AuthenticatedUser,
 } from "../middleware/require-auth.js";
+import { pauseJobCardTimer, startOrSwitchJobTimer } from "../services/job-timers.js";
 import { enqueueTicketStarted } from "../services/notification-outbox.js";
 
 export const jobCardsRouter = Router();
@@ -43,6 +45,7 @@ const createSchema = z
     relatedTicketIds: z.array(z.string().uuid()).max(20).default([]),
     assignedTo: z.string().uuid(),
     categoryId: z.number().int().positive(),
+    department: z.enum(departments).nullable().optional(),
     priority: prioritySchema.default("MEDIUM"),
     locationId: z.number().int().positive().nullable().optional(),
     locationDetails: z.string().trim().max(200).optional(),
@@ -90,7 +93,7 @@ jobCardsRouter.get("/summary", async (request, response) => {
   const filter = isAdmin(actor) ? "" : "WHERE assigned_to = $1";
   const result = await pool.query(
     `SELECT COUNT(*) FILTER (
-       WHERE status IN ('SCHEDULED', 'LIVE', 'PAUSED')
+       WHERE status IN ('SCHEDULED', 'LIVE', 'PAUSED', 'ESCALATED')
      )::INTEGER AS active
      FROM job_cards ${filter}`,
     values,
@@ -108,6 +111,7 @@ jobCardsRouter.get("/options", async (_request, response) => {
          tickets.description,
          tickets.priority,
          tickets.category_id AS "categoryId",
+         tickets.department,
          tickets.location_id AS "locationId",
          tickets.location_details AS "locationDetails",
          tickets.station_reference AS "stationReference",
@@ -117,6 +121,10 @@ jobCardsRouter.get("/options", async (_request, response) => {
        FROM tickets
        JOIN users AS reporters ON reporters.id = tickets.reporter_id
        WHERE tickets.status <> 'RESOLVED'
+         AND NOT EXISTS (
+           SELECT 1 FROM job_cards existing
+           WHERE existing.primary_ticket_id = tickets.id
+         )
        ORDER BY tickets.created_at DESC
        LIMIT 200`,
     ),
@@ -139,6 +147,7 @@ jobCardsRouter.get("/options", async (_request, response) => {
     technicians: technicians.rows,
     categories: categories.rows,
     locations: locations.rows,
+      departments,
   });
 });
 
@@ -162,6 +171,7 @@ jobCardsRouter.get("/", async (request, response) => {
        t.title AS "ticketTitle",
        COALESCE(t.priority, jc.priority)::text AS priority,
        c.name AS category,
+       jc.department AS department,
        u.id AS "technicianId",
        u.full_name AS "technicianName",
        u.role AS "technicianRole",
@@ -185,6 +195,7 @@ jobCardsRouter.get("/", async (request, response) => {
          MAX(started_at) FILTER (WHERE stopped_at IS NULL) AS active
        FROM time_entries
        WHERE job_card_id = jc.id
+          OR (job_card_id IS NULL AND ticket_id = jc.primary_ticket_id)
      ) AS te ON TRUE
      WHERE ($1 OR jc.assigned_to = $2)
        AND ($3 = 'ALL' OR jc.status::text = $3)
@@ -226,15 +237,27 @@ jobCardsRouter.post("/", async (request, response) => {
 
   try {
     await client.query("BEGIN");
+    let linkedDepartment: string | null = null;
 
     if (primaryTicketId) {
-      const linked = await client.query(
-        `SELECT id FROM tickets WHERE id = $1 AND status <> 'RESOLVED'`,
+      const linked = await client.query<{ id: string; department: string | null }>(
+        `SELECT id, department FROM tickets WHERE id = $1 AND status <> 'RESOLVED' FOR UPDATE`,
         [primaryTicketId],
       );
       if (!linked.rows[0]) {
         await client.query("ROLLBACK");
         response.status(400).json({ error: "Primary ticket was not found or is resolved" });
+        return;
+      }
+      linkedDepartment = linked.rows[0].department;
+
+      const existingJobCard = await client.query(
+        "SELECT id FROM job_cards WHERE primary_ticket_id = $1 LIMIT 1",
+        [primaryTicketId],
+      );
+      if (existingJobCard.rows[0]) {
+        await client.query("ROLLBACK");
+        response.status(409).json({ error: "This ticket already has a linked job card" });
         return;
       }
     }
@@ -244,9 +267,9 @@ jobCardsRouter.post("/", async (request, response) => {
          primary_ticket_id, assigned_to, created_by, title, description,
          category_id, priority, location_id, location_details,
          station_reference, scheduled_at, target_at,
-         walk_in_reporter_name, walk_in_reporter_email
+         walk_in_reporter_name, walk_in_reporter_email, department
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        RETURNING id, job_number`,
       [
         primaryTicketId,
@@ -263,6 +286,7 @@ jobCardsRouter.post("/", async (request, response) => {
         input.targetAt ?? null,
         primaryTicketId ? null : input.walkInReporterName,
         primaryTicketId ? null : input.walkInReporterEmail,
+        input.department ?? linkedDepartment,
       ],
     );
     const card = created.rows[0];
@@ -361,61 +385,57 @@ jobCardsRouter.post("/:id/timer/:action", async (request, response) => {
     return;
   }
 
+  if (action === "pause" && card.status !== "LIVE") {
+    response.status(409).json({ error: "Only an in-progress job card can be paused" });
+    return;
+  }
+  if (action === "start" && card.status !== "SCHEDULED") {
+    response.status(409).json({ error: "Only a pending job card can be started" });
+    return;
+  }
+  if (action === "resume" && !["PAUSED", "LIVE"].includes(card.status)) {
+    response.status(409).json({ error: "Only a paused job card can be resumed" });
+    return;
+  }
+
   const client = await pool.connect();
+  let alreadyRunning = false;
   try {
     await client.query("BEGIN");
     if (action === "pause") {
-      const stopped = await client.query(
-        `UPDATE time_entries
-         SET stopped_at = CURRENT_TIMESTAMP
-         WHERE job_card_id = $1 AND stopped_at IS NULL
-         RETURNING id`,
-        [card.id],
-      );
-      if (!stopped.rowCount) {
-        await client.query("ROLLBACK");
-        response.status(409).json({ error: "This job card has no live timer" });
-        return;
-      }
-      await client.query(
-        `UPDATE job_cards
-         SET status = 'PAUSED', updated_at = CURRENT_TIMESTAMP
-         WHERE id = $1`,
-        [card.id],
-      );
+      await pauseJobCardTimer(client, {
+        jobCardId: card.id,
+        ticketId: card.primary_ticket_id,
+        technicianId: card.assigned_to,
+      });
     } else {
-      const timer = await client.query<{ started_at: Date }>(
-        `INSERT INTO time_entries (ticket_id, technician_id, job_card_id)
-         VALUES ($1, $2, $3)
-         RETURNING started_at`,
-        [card.primary_ticket_id, card.assigned_to, card.id],
-      );
-      await client.query(
-        `UPDATE job_cards
-         SET status = 'LIVE', updated_at = CURRENT_TIMESTAMP
-         WHERE id = $1`,
-        [card.id],
-      );
+      const timer = await startOrSwitchJobTimer(client, {
+        ticketId: card.primary_ticket_id,
+        technicianId: card.assigned_to,
+        jobCardId: card.id,
+      });
+      alreadyRunning = timer.alreadyRunning;
 
       if (
         action === "start" &&
         card.primary_ticket_id &&
         card.ticket_status !== "IN_PROGRESS"
       ) {
-        await client.query(
+        const updatedTicket = await client.query(
           `UPDATE tickets
            SET status = 'IN_PROGRESS', updated_at = CURRENT_TIMESTAMP
-           WHERE id = $1`,
+           WHERE id = $1 AND status <> 'IN_PROGRESS'
+           RETURNING id`,
           [card.primary_ticket_id],
         );
-        if (card.reporter_email && card.ticket_number && card.ticket_title) {
+        if (updatedTicket.rowCount && card.reporter_email && card.ticket_number && card.ticket_title) {
           await enqueueTicketStarted(client, {
             ticketId: card.primary_ticket_id,
             reporterEmail: card.reporter_email,
             ticketNumber: card.ticket_number,
             ticketTitle: card.ticket_title,
             technicianName: card.technician_name,
-            startedAt: timer.rows[0].started_at,
+            startedAt: timer.startedAt,
           });
         }
       }
@@ -428,7 +448,7 @@ jobCardsRouter.post("/:id/timer/:action", async (request, response) => {
         card.primary_ticket_id,
         actor.id,
         `JOB_CARD_TIMER_${action.toUpperCase()}`,
-        JSON.stringify({ jobCardId: card.id }),
+        JSON.stringify({ jobCardId: card.id, alreadyRunning }),
       ],
     );
     await client.query("COMMIT");
@@ -437,7 +457,7 @@ jobCardsRouter.post("/:id/timer/:action", async (request, response) => {
     await client.query("ROLLBACK");
     if ((error as { code?: string }).code === "23505") {
       response.status(409).json({
-        error: "This technician or ticket already has a live timer",
+        error: "This ticket or job card already has a live timer",
       });
       return;
     }
@@ -700,6 +720,7 @@ jobCardsRouter.get("/:id", async (request, response) => {
        jc.station_reference AS "stationReference",
        t.id AS "ticketId", t.ticket_number AS "ticketNumber", t.title AS "ticketTitle",
        COALESCE(t.priority, jc.priority)::text AS priority,
+       jc.department AS department,
        COALESCE(r.full_name, jc.walk_in_reporter_name, 'Walk-in requester') AS "reporterName",
        COALESCE(r.email, jc.walk_in_reporter_email) AS "reporterEmail",
        (jc.primary_ticket_id IS NULL) AS "isWalkIn",

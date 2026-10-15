@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 
 import { pool } from "../db.js";
+import { departments } from "../domain/departments.js";
 import {
   requireAuth,
   type AuthenticatedRequest,
@@ -13,6 +14,7 @@ ticketsRouter.use(requireAuth);
 
 const createTicketSchema = z.object({
   categoryId: z.number().int().positive(),
+  department: z.enum(departments).nullable().optional(),
   locationId: z.number().int().positive().nullable().optional(),
   locationDetails: z.string().trim().max(200).optional(),
   stationReference: z.string().trim().max(50).optional(),
@@ -41,6 +43,7 @@ ticketsRouter.get("/metadata", async (_request, response) => {
     response.json({
       categories: categories.rows,
       locations: locations.rows,
+      departments,
     });
   } catch (error) {
     console.error("Could not load ticket metadata", error);
@@ -94,6 +97,7 @@ ticketsRouter.post("/", async (request, response) => {
          reporter_id,
          created_by,
          category_id,
+         department,
          location_id,
          location_details,
          station_reference,
@@ -102,7 +106,7 @@ ticketsRouter.post("/", async (request, response) => {
          priority,
          source
        )
-       VALUES ($1, $1, $2, $3, $4, $5, $6, $7, $8, 'WEB')
+       VALUES ($1, $1, $2, $3, $4, $5, $6, $7, $8, $9, 'WEB')
        RETURNING
          id,
          ticket_number,
@@ -113,6 +117,7 @@ ticketsRouter.post("/", async (request, response) => {
       [
         user.id,
         input.categoryId,
+        input.department ?? null,
         input.locationId ?? null,
         input.locationDetails || null,
         input.stationReference || null,
@@ -165,6 +170,7 @@ ticketsRouter.post("/", async (request, response) => {
         title: ticket.title,
         priority: ticket.priority,
         status: ticket.status,
+        department: input.department ?? null,
         createdAt: ticket.created_at,
       },
     });
@@ -196,6 +202,7 @@ ticketsRouter.get("/mine", async (request, response) => {
          tickets.title,
          tickets.priority,
          tickets.status,
+         tickets.department,
          tickets.location_details AS "locationDetails",
          tickets.station_reference AS "stationReference",
          tickets.created_at AS "createdAt",

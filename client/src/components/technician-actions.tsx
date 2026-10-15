@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { departments } from "@/lib/departments";
 
 type Option = { id: number; name: string };
 type Reporter = { id: string; fullName: string; email: string };
@@ -21,7 +22,6 @@ type Reporter = { id: string; fullName: string; email: string };
 export function ManualTicketDialog({ onCreated }: { onCreated: (message: string) => void | Promise<void> }) {
   const [open, setOpen] = useState(false);
   const [categories, setCategories] = useState<Option[]>([]);
-  const [locations, setLocations] = useState<Option[]>([]);
   const [reporters, setReporters] = useState<Reporter[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -33,12 +33,11 @@ export function ManualTicketDialog({ onCreated }: { onCreated: (message: string)
     setError("");
 
     void Promise.all([
-      api<{ categories: Option[]; locations: Option[] }>("/api/tickets/metadata"),
+      api<{ categories: Option[] }>("/api/tickets/metadata"),
       api<{ reporters: Reporter[] }>("/api/technician/reporters"),
     ])
       .then(([metadata, reporterData]) => {
         setCategories(metadata.categories);
-        setLocations(metadata.locations);
         setReporters(reporterData.reporters);
       })
       .catch((caughtError: unknown) => {
@@ -60,7 +59,7 @@ export function ManualTicketDialog({ onCreated }: { onCreated: (message: string)
         body: JSON.stringify({
           reporterId: String(data.get("reporterId") ?? ""),
           categoryId: Number(data.get("categoryId")),
-          locationId: data.get("locationId") ? Number(data.get("locationId")) : null,
+          department: String(data.get("department") ?? "") || null,
           locationDetails: String(data.get("locationDetails") ?? ""),
           stationReference: String(data.get("stationReference") ?? ""),
           title: String(data.get("title") ?? ""),
@@ -112,13 +111,13 @@ export function ManualTicketDialog({ onCreated }: { onCreated: (message: string)
                     <option value="LOW">Low</option><option value="MEDIUM">Medium</option><option value="HIGH">High</option><option value="CRITICAL">Critical</option>
                   </select>
                 </Field>
-                <Field label="Known location">
-                  <select name="locationId" className={selectClasses} defaultValue="">
-                    <option value="">None selected</option>
-                    {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
+                <Field label="Department">
+                  <select name="department" className={selectClasses} defaultValue="">
+                    <option value="">Select department</option>
+                    {departments.map((department) => <option key={department} value={department}>{department}</option>)}
                   </select>
                 </Field>
-                <Field label="Location details"><Input name="locationDetails" placeholder="Lab, office, or floor" maxLength={200} /></Field>
+                <Field label="Building, room, or area"><Input name="locationDetails" placeholder="Lab, office, or floor" maxLength={200} /></Field>
                 <Field label="Station or asset ID"><Input name="stationReference" placeholder="Station 12" maxLength={50} /></Field>
                 <Field label="Issue summary" span><Input name="title" minLength={5} maxLength={160} required /></Field>
                 <Field label="Issue description" span><Textarea name="description" className="min-h-28" minLength={10} maxLength={4000} required /></Field>

@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { DateTimePicker } from "@/components/date-time-picker";
 
 type ScheduleEvent = {
   id: string; title: string; eventType: "SLA" | "SITE_VISIT" | "MAINTENANCE" | "FOLLOW_UP";
@@ -63,14 +64,20 @@ export function CalendarDashboard({ userId, role }: { userId: string; role: User
     || role === "SYSTEM_ADMIN";
 
   async function saveEvent(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setSaving(true); setError("");
+    event.preventDefault(); setError("");
     const form = event.currentTarget;
     const data = new FormData(form);
+    const startsAt = String(data.get("startsAt") ?? "");
+    if (!startsAt) {
+      setError("Choose a start date and time.");
+      return;
+    }
     const isEditing = selectedEvent !== null;
+    setSaving(true);
     try {
       await api(isEditing ? `/api/calendar/${selectedEvent.id}` : "/api/calendar", { method: isEditing ? "PATCH" : "POST", body: JSON.stringify({
         title: data.get("title"), eventType: data.get("eventType"),
-        startsAt: new Date(String(data.get("startsAt"))).toISOString(),
+        startsAt: new Date(startsAt).toISOString(),
         endsAt: data.get("endsAt") ? new Date(String(data.get("endsAt"))).toISOString() : null,
         location: data.get("location"), notes: data.get("notes"),
         ticketId: data.get("ticketId") || null, assignedTo: data.get("assignedTo") || null,
@@ -127,7 +134,7 @@ export function CalendarDashboard({ userId, role }: { userId: string; role: User
           <Field label="Title" span><Input name="title" minLength={3} maxLength={160} required defaultValue={selectedEvent?.title ?? ""} disabled={!canEditSelectedEvent} /></Field>
           <Field label="Event type"><select name="eventType" className={selectClasses} defaultValue={selectedEvent?.eventType ?? "FOLLOW_UP"} disabled={!canEditSelectedEvent}><option value="SLA">SLA target</option><option value="SITE_VISIT">Site visit</option><option value="MAINTENANCE">Maintenance</option><option value="FOLLOW_UP">Follow-up</option></select></Field>
           <Field label="Assigned to"><select name="assignedTo" className={selectClasses} defaultValue={selectedEvent ? selectedEvent.assignedTo ?? "" : userId} disabled={!canEditSelectedEvent}><option value="">Unassigned</option>{staff.map((person) => <option key={person.id} value={person.id}>{person.fullName}</option>)}</select></Field>
-          <Field label="Starts"><Input type="datetime-local" name="startsAt" required defaultValue={toLocalInputValue(selectedEvent?.startsAt ?? null)} disabled={!canEditSelectedEvent} /></Field><Field label="Ends"><Input type="datetime-local" name="endsAt" defaultValue={toLocalInputValue(selectedEvent?.endsAt ?? null)} disabled={!canEditSelectedEvent} /></Field>
+          <Field label="Starts"><DateTimePicker key={open ? `starts-${selectedEvent?.id ?? "new"}` : "starts-closed"} label="Start date and time" name="startsAt" defaultValue={toLocalInputValue(selectedEvent?.startsAt ?? null)} required disabled={!canEditSelectedEvent} /></Field><Field label="Ends"><DateTimePicker key={open ? `ends-${selectedEvent?.id ?? "new"}` : "ends-closed"} label="End date and time" name="endsAt" defaultValue={toLocalInputValue(selectedEvent?.endsAt ?? null)} disabled={!canEditSelectedEvent} /></Field>
           <Field label="Linked ticket" span><select name="ticketId" className={selectClasses} defaultValue={selectedEvent?.ticketId ?? ""} disabled={!canEditSelectedEvent}><option value="">No linked ticket</option>{tickets.map((ticket) => <option key={ticket.id} value={ticket.id}>{ticket.ticketNumber} — {ticket.title}</option>)}</select></Field>
           <Field label="Location" span><Input name="location" maxLength={200} placeholder="Building, room or online" defaultValue={selectedEvent?.location ?? ""} disabled={!canEditSelectedEvent} /></Field><Field label="Notes" span><Textarea name="notes" maxLength={2000} defaultValue={selectedEvent?.notes ?? ""} disabled={!canEditSelectedEvent} /></Field>
         </div><DialogFooter><Button type="button" variant="outline" onClick={() => { setOpen(false); setSelectedEvent(null); }}>{selectedEvent && !canEditSelectedEvent ? "Close" : "Cancel"}</Button>{canEditSelectedEvent && <Button type="submit" className="bg-[#4B2C70] text-white" disabled={saving}>{saving ? <LoaderCircle className="animate-spin" /> : selectedEvent ? null : <Plus />}{saving ? "Saving..." : selectedEvent ? "Save changes" : "Create event"}</Button>}</DialogFooter>

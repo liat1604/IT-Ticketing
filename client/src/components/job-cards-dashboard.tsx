@@ -44,6 +44,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { api, formatDuration, formatValue, relativeTime } from "@/lib/api";
+import { departments } from "@/lib/departments";
+import { DateTimePicker } from "@/components/date-time-picker";
 import type { User } from "@/types";
 
 type PriorityLevel = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
@@ -60,6 +62,7 @@ type JobCard = {
   isWalkIn: boolean;
   priority: PriorityLevel;
   category: string;
+  department: string | null;
   technicianId: string;
   technicianName: string;
   technicianRole: string;
@@ -100,6 +103,7 @@ type TicketOption = {
   description: string;
   priority: PriorityLevel;
   categoryId: number;
+  department: string | null;
   locationId: number | null;
   locationDetails: string | null;
   stationReference: string | null;
@@ -114,6 +118,7 @@ type JobCardOptions = {
   technicians: NamedOption[];
   categories: NamedOption[];
   locations: NamedOption[];
+  departments: string[];
 };
 
 type JobCardForm = {
@@ -123,6 +128,7 @@ type JobCardForm = {
   description: string;
   assignedTo: string;
   categoryId: string;
+  department: string;
   priority: PriorityLevel;
   locationId: string;
   locationDetails: string;
@@ -266,7 +272,7 @@ export function JobCardsDashboard({
       new Date(card.targetAt).getTime() < now &&
       !["COMPLETED", "CANCELLED"].includes(card.status),
   ).length;
-  const live = cards.find((card) => card.status === "LIVE");
+  const liveCards = cards.filter((card) => card.status === "LIVE");
   const transitionCard = cards.find((card) => card.id === pendingTransition?.cardId) ?? null;
 
   async function moveCard(card: JobCard, targetStatus: KanbanStatus, note?: string) {
@@ -340,9 +346,6 @@ export function JobCardsDashboard({
       <div className="flex flex-wrap items-center justify-between gap-4 pb-2">
         {user.role !== "TECHNICIAN" && <h1 className="text-2xl font-semibold tracking-tight">Technician job cards</h1>}
         <div className="flex items-center gap-3">
-          <Badge className={badgePalette.brand}>
-            {counts.LIVE + counts.SCHEDULED + counts.PAUSED + counts.ESCALATED} active
-          </Badge>
           <Button
             className="bg-[#4B2C70] text-white hover:bg-[#3d235d]"
             onClick={() => setCreateOpen(true)}
@@ -365,38 +368,56 @@ export function JobCardsDashboard({
         <Stat label="Overdue" value={overdue} />
       </section>
 
-      {live && (
-        <Card className="overflow-hidden border-purple-200">
-          <div className="bg-[#4B2C70] p-5 text-white">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <Badge className={badgePalette.progress}>LIVE</Badge>
-                <p className="mt-3 text-sm text-purple-200">
-                  {live.jobNumber} · {live.category.toUpperCase()}
-                </p>
-                <h2 className="mt-1 text-2xl font-semibold">{live.title}</h2>
-                <p className="mt-2 text-purple-100">
-                  {live.ticketNumber
-                    ? `Linked ticket: ${live.ticketNumber} — ${live.ticketTitle}`
-                    : `Walk-in job · ${live.reporterName}`}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm text-purple-200">Time on job</p>
-                <p className="font-mono text-4xl font-semibold">
-                  {formatDuration(elapsed(live, now))}
-                </p>
-              </div>
-            </div>
-          </div>
-          <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
-            <p className="text-sm">
-              Assigned to <strong>{live.technicianName}</strong>
-              {live.location && ` · ${live.location}`}
+      {!loading && !error && cards.length === 0 && (
+        <Card className="border-dashed border-slate-300">
+          <CardContent className="py-8 text-center">
+            <h2 className="font-semibold">No job cards yet</h2>
+            <p className="mx-auto mt-2 max-w-2xl text-sm text-muted-foreground">
+              Tickets are available when you create a job card. Choose “Create job card” to link an existing ticket, or create a walk-in job.
             </p>
-            <Button onClick={() => setSelected(live.id)}>Open job card</Button>
           </CardContent>
         </Card>
+      )}
+
+      {liveCards.length > 0 && (
+        <section className="space-y-3" aria-label="Jobs in progress">
+          <h2 className="text-lg font-semibold">In progress</h2>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {liveCards.map((live) => (
+              <Card key={live.id} className="overflow-hidden border-purple-200">
+                <div className="bg-[#4B2C70] p-4 text-white">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <Badge className={badgePalette.progress}>LIVE</Badge>
+                      <p className="mt-3 text-sm text-purple-200">
+                        {live.jobNumber} · {live.category.toUpperCase()}
+                      </p>
+                      <h3 className="mt-1 truncate text-lg font-semibold">{live.title}</h3>
+                      <p className="mt-2 truncate text-sm text-purple-100">
+                        {live.ticketNumber
+                          ? `Ticket: ${live.ticketNumber} — ${live.ticketTitle}`
+                          : `Walk-in job · ${live.reporterName}`}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-xs text-purple-200">Time on job</p>
+                      <p className="font-mono text-2xl font-semibold">
+                        {formatDuration(elapsed(live, now))}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <CardContent className="flex flex-wrap items-center justify-between gap-3 py-3">
+                  <p className="text-sm">
+                    <strong>{live.technicianName}</strong>
+                    {live.location && ` · ${live.location}`}
+                  </p>
+                  <Button size="sm" onClick={() => setSelected(live.id)}>Open job card</Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
       )}
 
       <Card>
@@ -661,6 +682,7 @@ function JobCardFace({ card, now }: { card: JobCard; now: number }) {
       <p className="mt-2 text-sm text-muted-foreground">
         {card.ticketNumber ? card.ticketNumber + "  -  " + card.reporterName : "Walk-in  -  " + card.reporterName}
       </p>
+      <p className="mt-2 text-sm font-medium">{card.department ?? "Department not set"}</p>
       <p className="mt-3 text-sm">{card.technicianName}</p>
       <div className="mt-3 flex justify-between text-xs text-muted-foreground">
         <span>{card.location ?? "No location"}</span>
@@ -677,6 +699,7 @@ function emptyForm(user: User): JobCardForm {
     description: "",
     assignedTo: user.role === "TECHNICIAN" ? user.id : "",
     categoryId: "",
+    department: "",
     priority: "MEDIUM",
     locationId: "",
     locationDetails: "",
@@ -688,6 +711,71 @@ function emptyForm(user: User): JobCardForm {
     walkInReporterName: "",
     walkInReporterEmail: "",
   };
+}
+
+function validateCreateJobCardForm(
+  form: JobCardForm,
+  options: JobCardOptions,
+) {
+  const issues: Array<{ label: string; fieldId: string }> = [];
+  const addIssue = (label: string, fieldId: string) =>
+    issues.push({ label, fieldId });
+  const title = form.title.trim();
+  const description = form.description.trim();
+  const requesterName = form.walkInReporterName.trim();
+  const requesterEmail = form.walkInReporterEmail.trim();
+
+  if (!title) addIssue("job title", "job-card-title");
+  else if (title.length < 5 || title.length > 160) {
+    addIssue("job title (5–160 characters)", "job-card-title");
+  }
+  if (!options.technicians.some((item) => String(item.id) === form.assignedTo)) {
+    addIssue("assigned technician", "job-card-technician");
+  }
+  if (!options.categories.some((item) => String(item.id) === form.categoryId)) {
+    addIssue("category", "job-card-category");
+  }
+  if (form.department && !options.departments.includes(form.department)) {
+    addIssue("department", "job-card-department");
+  }
+  if (!description) addIssue("work description", "job-card-description");
+  else if (description.length < 10 || description.length > 4000) {
+    addIssue("work description (10–4,000 characters)", "job-card-description");
+  }
+
+  if (!form.primaryTicketId) {
+    if (!requesterName) addIssue("walk-in requester name", "walk-in-requester-name");
+    else if (requesterName.length < 2 || requesterName.length > 120) {
+      addIssue("requester name (2–120 characters)", "walk-in-requester-name");
+    }
+    if (
+      requesterEmail &&
+      (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(requesterEmail) ||
+        !requesterEmail.toLowerCase().endsWith("@mynwu.ac.za") ||
+        requesterEmail.length > 255)
+    ) {
+      addIssue("requester email (valid @mynwu.ac.za address)", "walk-in-requester-email");
+    }
+  }
+
+  if (form.locationDetails.trim().length > 200) {
+    addIssue("location details (up to 200 characters)", "job-card-location-details");
+  }
+  if (form.stationReference.trim().length > 80) {
+    addIssue("station or asset (up to 80 characters)", "job-card-station-reference");
+  }
+  if (form.internalNotes.trim().length > 4000) {
+    addIssue("internal notes (up to 4,000 characters)", "job-card-internal-notes");
+  }
+  if (form.relatedTicketIds.length > 20) {
+    addIssue("related tickets (up to 20)", "job-card-related-tickets");
+  }
+  const checklistItems = form.checklist.split("\n").map((item) => item.trim()).filter(Boolean);
+  if (checklistItems.length > 30 || checklistItems.some((item) => item.length > 300)) {
+    addIssue("checklist (up to 30 items, 300 characters each)", "job-card-checklist");
+  }
+
+  return issues;
 }
 
 function CreateJobCardDialog({
@@ -732,9 +820,11 @@ function CreateJobCardDialog({
 
   function update<K extends keyof JobCardForm>(key: K, value: JobCardForm[K]) {
     setForm((current) => ({ ...current, [key]: value }));
+    setError("");
   }
 
   function selectTicket(ticketId: string) {
+    setError("");
     if (!ticketId) {
       setForm((current) => ({
         ...current,
@@ -743,6 +833,7 @@ function CreateJobCardDialog({
         title: "",
         description: "",
         categoryId: "",
+        department: "",
         priority: "MEDIUM",
         locationId: "",
         locationDetails: "",
@@ -763,6 +854,7 @@ function CreateJobCardDialog({
       title: ticket.title,
       description: ticket.description,
       categoryId: String(ticket.categoryId),
+      department: ticket.department ?? "",
       priority: ticket.priority,
       locationId: ticket.locationId ? String(ticket.locationId) : "",
       locationDetails: ticket.locationDetails ?? "",
@@ -777,6 +869,20 @@ function CreateJobCardDialog({
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!options) {
+      setError("Job-card options are still loading. Please try again in a moment.");
+      return;
+    }
+
+    const issues = validateCreateJobCardForm(form, options);
+    if (issues.length > 0) {
+      setError(`Please complete or correct: ${issues.map((issue) => issue.label).join(", ")}.`);
+      requestAnimationFrame(() => {
+        document.getElementById(issues[0].fieldId)?.focus();
+      });
+      return;
+    }
+
     setSaving(true);
     setError("");
     try {
@@ -789,6 +895,7 @@ function CreateJobCardDialog({
           relatedTicketIds: form.relatedTicketIds,
           assignedTo: form.assignedTo,
           categoryId: Number(form.categoryId),
+          department: form.department || null,
           priority: form.priority,
           locationId: form.locationId ? Number(form.locationId) : null,
           locationDetails: form.locationDetails,
@@ -823,7 +930,7 @@ function CreateJobCardDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-2xl">
-        <form onSubmit={submit}>
+        <form noValidate onSubmit={submit}>
           <DialogHeader>
             <DialogTitle>Create job card</DialogTitle>
             <DialogDescription>
@@ -831,6 +938,11 @@ function CreateJobCardDialog({
               capture a walk-in job manually.
             </DialogDescription>
           </DialogHeader>
+          {error && (
+            <div className="mt-4">
+              <ErrorText text={error} />
+            </div>
+          )}
           {!options ? (
             <Loading />
           ) : (
@@ -879,6 +991,7 @@ function CreateJobCardDialog({
                 <>
                   <Field label="Walk-in requester name">
                     <Input
+                      id="walk-in-requester-name"
                       value={form.walkInReporterName}
                       onChange={(event) =>
                         update("walkInReporterName", event.target.value)
@@ -889,6 +1002,7 @@ function CreateJobCardDialog({
                   </Field>
                   <Field label="Requester email (optional)">
                     <Input
+                      id="walk-in-requester-email"
                       value={form.walkInReporterEmail}
                       onChange={(event) =>
                         update("walkInReporterEmail", event.target.value)
@@ -902,6 +1016,7 @@ function CreateJobCardDialog({
 
               <Field label="Job title">
                 <Input
+                  id="job-card-title"
                   value={form.title}
                   onChange={(event) => update("title", event.target.value)}
                   minLength={5}
@@ -910,6 +1025,7 @@ function CreateJobCardDialog({
               </Field>
               <Field label="Assigned technician">
                 <select
+                  id="job-card-technician"
                   className={selectClasses}
                   value={form.assignedTo}
                   onChange={(event) => update("assignedTo", event.target.value)}
@@ -927,6 +1043,7 @@ function CreateJobCardDialog({
               {selectedTicket && (
                 <Field label="Related tickets" span>
                   <select
+                    id="job-card-related-tickets"
                     className={`${selectClasses} h-24`}
                     multiple
                     value={form.relatedTicketIds}
@@ -953,6 +1070,7 @@ function CreateJobCardDialog({
 
               <Field label="Category">
                 <select
+                  id="job-card-category"
                   className={selectClasses}
                   value={form.categoryId}
                   onChange={(event) => update("categoryId", event.target.value)}
@@ -984,28 +1102,31 @@ function CreateJobCardDialog({
                   )}
                 </select>
               </Field>
-              <Field label="Campus location">
+              <Field label="Department">
                 <select
+                  id="job-card-department"
                   className={selectClasses}
-                  value={form.locationId}
-                  onChange={(event) => update("locationId", event.target.value)}
+                  value={form.department}
+                  onChange={(event) => update("department", event.target.value)}
                 >
-                  <option value="">Select location</option>
-                  {options.locations.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name}
+                  <option value="">Select department</option>
+                  {(options.departments ?? departments).map((department) => (
+                    <option key={department} value={department}>
+                      {department}
                     </option>
                   ))}
                 </select>
               </Field>
-              <Field label="Location details">
+              <Field label="Building, room, or area">
                 <Input
+                  id="job-card-location-details"
                   value={form.locationDetails}
                   onChange={(event) => update("locationDetails", event.target.value)}
                 />
               </Field>
               <Field label="Station or asset">
                 <Input
+                  id="job-card-station-reference"
                   value={form.stationReference}
                   onChange={(event) =>
                     update("stationReference", event.target.value)
@@ -1013,21 +1134,22 @@ function CreateJobCardDialog({
                 />
               </Field>
               <Field label="Scheduled date/time">
-                <Input
+                <DateTimePicker
+                  label="Scheduled date/time"
                   value={form.scheduledAt}
-                  onChange={(event) => update("scheduledAt", event.target.value)}
-                  type="datetime-local"
+                  onChange={(value) => update("scheduledAt", value)}
                 />
               </Field>
               <Field label="Target completion">
-                <Input
+                <DateTimePicker
+                  label="Target completion"
                   value={form.targetAt}
-                  onChange={(event) => update("targetAt", event.target.value)}
-                  type="datetime-local"
+                  onChange={(value) => update("targetAt", value)}
                 />
               </Field>
               <Field label="Work description" span>
                 <Textarea
+                  id="job-card-description"
                   value={form.description}
                   onChange={(event) => update("description", event.target.value)}
                   minLength={10}
@@ -1036,21 +1158,18 @@ function CreateJobCardDialog({
               </Field>
               <Field label="Initial checklist items (one per line)" span>
                 <Textarea
+                  id="job-card-checklist"
                   value={form.checklist}
                   onChange={(event) => update("checklist", event.target.value)}
                 />
               </Field>
               <Field label="Internal notes" span>
                 <Textarea
+                  id="job-card-internal-notes"
                   value={form.internalNotes}
                   onChange={(event) => update("internalNotes", event.target.value)}
                 />
               </Field>
-              {error && (
-                <div className="sm:col-span-2">
-                  <ErrorText text={error} />
-                </div>
-              )}
             </div>
           )}
           <DialogFooter>
@@ -1061,7 +1180,7 @@ function CreateJobCardDialog({
             >
               Cancel
             </Button>
-            <Button disabled={saving || !options}>
+            <Button type="submit" disabled={saving || !options}>
               {saving ? <LoaderCircle className="animate-spin" /> : <Plus />}
               {saving ? "Creating..." : "Create job card"}
             </Button>
@@ -1278,6 +1397,9 @@ function JobCardDetail({
                   <p>
                     <strong>Requester:</strong> {card.reporterName}
                     {card.reporterEmail ? ` · ${card.reporterEmail}` : ""}
+                  </p>
+                  <p>
+                    <strong>Department:</strong> {card.department ?? "—"}
                   </p>
                   <p>
                     <strong>Location:</strong> {card.location ?? "—"}{" "}
