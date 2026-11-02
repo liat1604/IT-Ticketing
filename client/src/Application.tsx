@@ -44,7 +44,11 @@ export default function Application() {
   if (!user) return <AuthenticationPage onAuthenticated={setUser} />;
 
   const navigation = navigationFor(user, activeJobCards);
-  function navigate(next: PortalSection) { setSection(next); setMobileOpen(false); }
+  function navigate(next: PortalSection) {
+    setSection(next);
+    setMobileOpen(false);
+    window.scrollTo(0, 0);
+  }
 
   return <div className="min-h-dvh bg-[#f7f8fa] lg:grid lg:grid-cols-[264px_minmax(0,1fr)]">
     <aside className={`portal-sidebar-motion z-30 flex h-dvh flex-col overflow-hidden border-r border-white/10 bg-[#4B2C70] text-white lg:sticky lg:top-0 lg:h-screen ${mobileOpen ? "fixed inset-0" : "hidden lg:flex"}`}>

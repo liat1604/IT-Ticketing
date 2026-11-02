@@ -6,7 +6,7 @@ import { pool } from "../db.js";
 import type { Department } from "../domain/departments.js";
 
 type UserRole = "REPORTER" | "TECHNICIAN" | "ADMIN" | "SYSTEM_ADMIN";
-type TicketStatus = "NEW" | "IN_PROGRESS" | "ESCALATED" | "RESOLVED";
+type TicketStatus = "NEW" | "ASSIGNED" | "IN_PROGRESS" | "ESCALATED" | "RESOLVED";
 type SeedUser = {
   fullName: string;
   email: string;
@@ -205,10 +205,86 @@ const tickets: SeedTicket[] = [
     ageHours: 144,
     resolutionSummary: "Isolated the affected UPS, cleared the blocked ventilation path and confirmed stable operating temperature.",
   },
+  {
+    key: "DEMO-STATISTICS-PRINTER",
+    title: "Statistics lab printer queue keeps stopping",
+    description: "Print jobs remain queued after the printer reports ready, affecting practical handouts for the Statistics lab.",
+    category: "Hardware",
+    department: "Statistics",
+    location: "Lab G30",
+    locationDetails: "Statistics practical room printer",
+    priority: "HIGH",
+    status: "IN_PROGRESS",
+    technicianEmail: "sebastian.klopper@mynwu.ac.za",
+    ageHours: 9,
+  },
+  {
+    key: "DEMO-MATH-LICENCE-RENEWAL",
+    title: "Mathematics lab software licence renewal",
+    description: "Several Mathematics workstations report that the installed analysis software cannot validate its campus licence.",
+    category: "Software",
+    department: "Mathematics",
+    location: "Lab G14",
+    locationDetails: "Workstations 20 to 26",
+    priority: "MEDIUM",
+    status: "ASSIGNED",
+    technicianEmail: "sebastian.klopper@mynwu.ac.za",
+    ageHours: 12,
+  },
+  {
+    key: "DEMO-CSIS-LECTERN-AUDIO",
+    title: "No audio output from the CSIS lecture lectern",
+    description: "The lectern computer is detected by the display, but audio does not reach the room speakers during lectures.",
+    category: "Hardware",
+    department: "CSIS",
+    location: "Lab G14",
+    locationDetails: "Front lectern audio connection",
+    priority: "MEDIUM",
+    status: "NEW",
+    ageHours: 4,
+  },
+  {
+    key: "DEMO-STATISTICS-MFA-LOOP",
+    title: "Statistics portal sign-in repeats the MFA prompt",
+    description: "After approving the multi-factor prompt, the Statistics portal returns to the sign-in screen instead of opening the dashboard.",
+    category: "Access",
+    department: "Statistics",
+    location: "Online",
+    locationDetails: "Statistics portal dashboard",
+    priority: "HIGH",
+    status: "NEW",
+    ageHours: 6,
+  },
+  {
+    key: "DEMO-MATH-SHARED-DRIVE",
+    title: "Mathematics course materials drive is unavailable",
+    description: "Staff can sign in successfully but cannot open the shared drive containing current course materials.",
+    category: "Access",
+    department: "Mathematics",
+    location: "Building G",
+    locationDetails: "Mathematics staff office",
+    priority: "HIGH",
+    status: "ASSIGNED",
+    technicianEmail: "sebastian.klopper@mynwu.ac.za",
+    ageHours: 11,
+  },
+  {
+    key: "DEMO-CSIS-BACKUP-RESTORE",
+    title: "CSIS file server backup restore request",
+    description: "A project folder was accidentally overwritten and needs to be restored from the latest available backup.",
+    category: "Software",
+    department: "CSIS",
+    location: "Server Room",
+    locationDetails: "CSIS file server backup volume",
+    priority: "MEDIUM",
+    status: "NEW",
+    ageHours: 3,
+  },
 ];
 
 const requiredTicketStatuses: TicketStatus[] = [
   "NEW",
+  "ASSIGNED",
   "IN_PROGRESS",
   "ESCALATED",
   "RESOLVED",
@@ -250,6 +326,51 @@ const demoCalendarEvents: DemoCalendarEvent[] = [
     durationMinutes: 30,
     location: "Building G",
     notes: "Check the Central IT escalation and update the linked ticket.",
+  },
+  {
+    ticketKey: "DEMO-STATISTICS-PRINTER",
+    title: "Statistics printer queue inspection",
+    eventType: "SITE_VISIT",
+    startsInHours: 30,
+    durationMinutes: 45,
+    location: "Lab G30",
+    notes: "Inspect the printer queue, spooler service and a sample of test prints.",
+  },
+  {
+    ticketKey: "DEMO-MATH-LICENCE-RENEWAL",
+    title: "Mathematics licence validation follow-up",
+    eventType: "FOLLOW_UP",
+    startsInHours: 54,
+    durationMinutes: 30,
+    location: "Lab G14",
+    notes: "Confirm the campus licence validates on the affected Mathematics workstations.",
+  },
+  {
+    ticketKey: "DEMO-STATISTICS-MFA-LOOP",
+    title: "Statistics portal MFA review",
+    eventType: "FOLLOW_UP",
+    startsInHours: 78,
+    durationMinutes: 30,
+    location: "Online",
+    notes: "Review the sign-in flow and confirm the portal opens after MFA approval.",
+  },
+  {
+    ticketKey: "DEMO-MATH-SHARED-DRIVE",
+    title: "Mathematics shared drive access check",
+    eventType: "SITE_VISIT",
+    startsInHours: 102,
+    durationMinutes: 45,
+    location: "Building G",
+    notes: "Verify staff access to the course materials drive from the Mathematics office.",
+  },
+  {
+    ticketKey: "DEMO-CSIS-BACKUP-RESTORE",
+    title: "CSIS backup restore review",
+    eventType: "MAINTENANCE",
+    startsInHours: 126,
+    durationMinutes: 60,
+    location: "Server Room",
+    notes: "Review the latest backup and validate the requested project-folder restore point.",
   },
 ];
 
@@ -863,7 +984,7 @@ async function main() {
     );
 
     await client.query("COMMIT");
-    console.log("Demo data ready: one account per role, eight workflow tickets, ticket-linked job cards, two walk-in jobs, and four ticket appointments.");
+    console.log(`Demo data ready: one account per role, ${tickets.length} workflow tickets, ticket-linked job cards, ${demoWalkIns.length} walk-in jobs, and ${demoCalendarEvents.length} ticket appointments.`);
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;

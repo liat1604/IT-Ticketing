@@ -122,6 +122,7 @@ export function TicketDetailDialog({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [internal, setInternal] = useState(false);
+  const [awaitingFeedback, setAwaitingFeedback] = useState(false);
   const [activeTicketId, setActiveTicketId] = useState<string | null>(ticketId);
   const [showSubIssueForm, setShowSubIssueForm] = useState(false);
   const [subIssueOptions, setSubIssueOptions] = useState<SubIssueOptions | null>(null);
@@ -147,6 +148,8 @@ export function TicketDetailDialog({
     if (open) {
       setActiveTicketId(ticketId);
       setShowSubIssueForm(false);
+      setInternal(false);
+      setAwaitingFeedback(false);
     }
   }, [open, ticketId]);
 
@@ -173,10 +176,12 @@ export function TicketDetailDialog({
         body: JSON.stringify({
           body,
           visibility: internal ? "INTERNAL" : "PUBLIC",
+          awaitingFeedback: role !== "REPORTER" && !internal && awaitingFeedback,
         }),
       });
       form.reset();
       setInternal(false);
+      setAwaitingFeedback(false);
       await loadDetail();
       await onChanged?.();
     } catch (caughtError) {
@@ -279,7 +284,16 @@ export function TicketDetailDialog({
                 <Badge variant="secondary">{formatValue(detail.ticket.status)}</Badge>
                 <Badge variant="outline">{detail.ticket.category}</Badge>
                 {detail.ticket.source === "WALK_IN" && <Badge variant="outline">Walk-in</Badge>}
-                {detail.ticket.parentTicketNumber && <Badge className="bg-purple-100 text-[#4B2C70]">Sub-issue of {detail.ticket.parentTicketNumber}</Badge>}
+                {detail.ticket.parentTicketId && detail.ticket.parentTicketNumber && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTicketId(detail.ticket.parentTicketId)}
+                    className="inline-flex h-5 items-center rounded-full bg-purple-100 px-2 text-xs font-medium text-[#4B2C70] transition-colors hover:bg-purple-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4B2C70] focus-visible:ring-offset-2"
+                    aria-label={`Open parent ticket ${detail.ticket.parentTicketNumber}`}
+                  >
+                    Sub-issue of {detail.ticket.parentTicketNumber}
+                  </button>
+                )}
               </div>
 
               <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-slate-700">
@@ -433,14 +447,31 @@ export function TicketDetailDialog({
                   />
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     {isStaff ? (
-                      <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <input
-                          type="checkbox"
-                          checked={internal}
-                          onChange={(event) => setInternal(event.target.checked)}
-                        />
-                        Internal technician note
-                      </label>
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                        <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <input
+                            type="checkbox"
+                            checked={internal}
+                            disabled={sending}
+                            onChange={(event) => {
+                              const nextInternal = event.target.checked;
+                              setInternal(nextInternal);
+                              if (nextInternal) setAwaitingFeedback(false);
+                            }}
+                          />
+                          Internal technician note
+                        </label>
+                        <label className={`flex items-center gap-2 text-sm ${internal ? "text-slate-400" : "text-muted-foreground"}`}>
+                          <input
+                            type="checkbox"
+                            name="awaitingFeedback"
+                            checked={awaitingFeedback}
+                            disabled={internal || sending}
+                            onChange={(event) => setAwaitingFeedback(event.target.checked)}
+                          />
+                          Mark ticket as Awaiting Feedback
+                        </label>
+                      </div>
                     ) : (
                       <span className="text-xs text-muted-foreground">Your reply is visible to the assigned support team.</span>
                     )}

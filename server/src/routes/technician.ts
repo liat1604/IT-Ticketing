@@ -18,30 +18,13 @@ technicianRouter.use(
 );
 const updateStatusSchema = z
   .object({
-    status: z.enum([
-      "IN_PROGRESS",
-      "AWAITING_FEEDBACK",
-      "RESOLVED",
-    ]),
+    status: z.literal("RESOLVED"),
     resolutionSummary: z
       .string()
       .trim()
+      .min(10)
       .max(2000)
-      .optional(),
-  })
-  .superRefine((data, context) => {
-    if (
-      data.status === "RESOLVED" &&
-      (!data.resolutionSummary ||
-        data.resolutionSummary.length < 10)
-    ) {
-      context.addIssue({
-        code: "custom",
-        path: ["resolutionSummary"],
-        message:
-          "A resolution summary of at least 10 characters is required.",
-      });
-    }
+      .nonempty(),
   });
 
 const manualTicketSchema = z.object({
@@ -81,6 +64,7 @@ technicianRouter.get("/queue", async (_request, response) => {
          reporters.email AS "reporterEmail",
          technicians.id AS "technicianId",
          technicians.full_name AS "technicianName",
+         parent.id AS "parentTicketId",
          parent.ticket_number AS "parentTicketNumber",
          parent.title AS "parentTicketTitle",
          COALESCE(timer_totals.recorded_seconds, 0)::INTEGER
@@ -663,38 +647,25 @@ technicianRouter.patch(
         );
       }
 
-      const startedNow = status === "IN_PROGRESS" && ticket.status !== "IN_PROGRESS";
-
-      if (startedNow) {
-        await enqueueTicketStarted(client, {
-          ticketId: ticket.id,
-          reporterEmail: ticket.reporter_email,
-          ticketNumber: ticket.ticket_number,
-          ticketTitle: ticket.title,
-          technicianName: user.fullName,
-          startedAt: updatedTicket.updated_at,
-        });
-      } else {
-        await client.query(
-          `INSERT INTO notification_outbox (
+      await client.query(
+        `INSERT INTO notification_outbox (
            ticket_id,
            recipient_email,
            event_type,
            payload
          )
          VALUES ($1, $2, 'TICKET_STATUS_CHANGED', $3::jsonb)`,
-          [
-            ticket.id,
-            ticket.reporter_email,
-            JSON.stringify({
-              ticketNumber: ticket.ticket_number,
-              title: ticket.title,
-              status: updatedTicket.status,
-              resolutionSummary: updatedTicket.resolution_summary,
-            }),
-          ],
-        );
-      }
+        [
+          ticket.id,
+          ticket.reporter_email,
+          JSON.stringify({
+            ticketNumber: ticket.ticket_number,
+            title: ticket.title,
+            status: updatedTicket.status,
+            resolutionSummary: updatedTicket.resolution_summary,
+          }),
+        ],
+      );
 
       await client.query("COMMIT");
 

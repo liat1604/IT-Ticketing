@@ -469,7 +469,7 @@ export function JobCardsDashboard({
                 getItemValue={(card) => card.id}
                 restoreOnCancel
               >
-                <KanbanBoard className="grid min-w-0 grid-cols-1 gap-4 pb-3 sm:grid-cols-2 xl:grid-cols-3">
+                <KanbanBoard className="grid min-w-0 grid-cols-1 content-start items-start auto-rows-auto gap-4 pb-3 sm:grid-cols-2 xl:grid-cols-3">
                   {kanbanColumns.map((column) => (
                     <KanbanColumnView
                       key={column.status}
@@ -601,7 +601,7 @@ function KanbanColumnView({
   return (
     <KanbanColumn
       value={column.status}
-      className={"min-h-80 overflow-hidden rounded-2xl border " + column.className}
+      className={"min-h-64 overflow-hidden rounded-2xl border " + column.className}
       role="group"
       aria-label={column.label + " job cards"}
     >
@@ -614,7 +614,7 @@ function KanbanColumnView({
       </header>
       <KanbanColumnContent
         value={column.status}
-        className="min-h-56 flex-1 gap-3 p-3"
+        className="min-h-40 flex-1 gap-3 p-3"
       >
         {cards.map((card) => (
           <DraggableJobCard

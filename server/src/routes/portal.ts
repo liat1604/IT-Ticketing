@@ -15,6 +15,14 @@ const ticketIdSchema = z.string().uuid();
 const commentSchema = z.object({
   body: z.string().trim().min(1).max(4000),
   visibility: z.enum(["PUBLIC", "INTERNAL"]).default("PUBLIC"),
+  awaitingFeedback: z.boolean().default(false),
+}).superRefine((input, context) => {
+  if (input.awaitingFeedback && input.body.trim().length < 5) {
+    context.addIssue({ code: "custom", path: ["body"], message: "Add a note of at least 5 characters before requesting feedback." });
+  }
+  if (input.awaitingFeedback && input.visibility !== "PUBLIC") {
+    context.addIssue({ code: "custom", path: ["visibility"], message: "A feedback request must be a public note." });
+  }
 });
 const subIssueSchema = z.object({
   title: z.string().trim().min(5).max(160),
@@ -459,6 +467,10 @@ portalRouter.post("/tickets/:ticketId/comments", async (request, response) => {
     response.status(403).json({ error: "Reporters cannot create internal notes" });
     return;
   }
+  if (user.role === "REPORTER" && input.awaitingFeedback) {
+    response.status(403).json({ error: "Only support staff can mark a ticket as awaiting feedback" });
+    return;
+  }
 
   const client = await pool.connect();
 
@@ -531,6 +543,18 @@ portalRouter.post("/tickets/:ticketId/comments", async (request, response) => {
     );
     const comment = commentResult.rows[0];
 
+    const statusChangedToAwaitingFeedback =
+      input.awaitingFeedback && ticket.status !== "AWAITING_FEEDBACK";
+
+    if (statusChangedToAwaitingFeedback) {
+      await client.query(
+        `UPDATE tickets
+         SET status = 'AWAITING_FEEDBACK', updated_at = CURRENT_TIMESTAMP
+         WHERE id = $1`,
+        [ticket.id],
+      );
+    }
+
     await client.query(
       `INSERT INTO audit_events (ticket_id, actor_id, action, new_values)
        VALUES ($1, $2, 'COMMENT_ADDED', $3::jsonb)`,
@@ -540,6 +564,21 @@ portalRouter.post("/tickets/:ticketId/comments", async (request, response) => {
         JSON.stringify({ commentId: comment.id, visibility: comment.visibility }),
       ],
     );
+
+    if (statusChangedToAwaitingFeedback) {
+      await client.query(
+        `INSERT INTO audit_events (
+           ticket_id, actor_id, action, previous_values, new_values
+         )
+         VALUES ($1, $2, 'TICKET_STATUS_CHANGED', $3::jsonb, $4::jsonb)`,
+        [
+          ticket.id,
+          user.id,
+          JSON.stringify({ status: ticket.status }),
+          JSON.stringify({ status: "AWAITING_FEEDBACK", commentId: comment.id }),
+        ],
+      );
+    }
 
     if (input.visibility === "PUBLIC") {
       const recipientEmail = user.role === "REPORTER"
@@ -554,15 +593,17 @@ portalRouter.post("/tickets/:ticketId/comments", async (request, response) => {
              event_type,
              payload
            )
-           VALUES ($1, $2, 'COMMENT_ADDED', $3::jsonb)`,
+           VALUES ($1, $2, $3, $4::jsonb)`,
           [
             ticket.id,
             recipientEmail,
+            statusChangedToAwaitingFeedback ? "TICKET_STATUS_CHANGED" : "COMMENT_ADDED",
             JSON.stringify({
               ticketNumber: ticket.ticket_number,
               title: ticket.title,
               authorName: user.fullName,
               comment: comment.body,
+              ...(statusChangedToAwaitingFeedback ? { status: "AWAITING_FEEDBACK" } : {}),
             }),
           ],
         );

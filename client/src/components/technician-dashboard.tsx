@@ -43,6 +43,7 @@ type QueueTicket = {
   locationDetails: string | null;
   stationReference: string | null;
   dueAt: string | null;
+  parentTicketId: string | null;
   parentTicketNumber: string | null;
   parentTicketTitle: string | null;
   reporterName: string;
@@ -378,10 +379,15 @@ export function TechnicianDashboard({ userId, userRole }: { userId: string; user
                       <Badge variant="secondary">
                         {formatValue(ticket.status)}
                       </Badge>
-                      {ticket.parentTicketNumber && (
-                        <Badge className="bg-purple-100 text-[#4B2C70]">
+                      {ticket.parentTicketId && ticket.parentTicketNumber && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedTicketId(ticket.parentTicketId)}
+                          className="inline-flex h-5 items-center rounded-full bg-purple-100 px-2 text-xs font-medium text-[#4B2C70] transition-colors hover:bg-purple-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4B2C70] focus-visible:ring-offset-2"
+                          aria-label={`Open parent ticket ${ticket.parentTicketNumber}`}
+                        >
                           Sub-issue of {ticket.parentTicketNumber}
-                        </Badge>
+                        </button>
                       )}
                     </div>
 

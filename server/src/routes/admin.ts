@@ -221,6 +221,7 @@ adminRouter.get("/overview", async (request, response) => {
                'opened'::text AS scope,
                tickets.id,
                tickets.category_id,
+               tickets.department,
                tickets.assigned_to,
                tickets.reporter_id,
                tickets.created_at,
@@ -233,6 +234,7 @@ adminRouter.get("/overview", async (request, response) => {
                'closed'::text AS scope,
                tickets.id,
                tickets.category_id,
+               tickets.department,
                tickets.assigned_to,
                tickets.reporter_id,
                tickets.created_at,
@@ -269,6 +271,7 @@ adminRouter.get("/overview", async (request, response) => {
            ), ticket_metrics AS (
              SELECT
                report_tickets.scope,
+               report_tickets.department,
                categories.name AS topic,
                COALESCE(technicians.full_name, 'Unassigned') AS agent,
                report_tickets.assigned_to IS NOT NULL AS assigned,
@@ -294,12 +297,12 @@ adminRouter.get("/overview", async (request, response) => {
            SELECT
              scope,
              CASE
-               WHEN GROUPING(topic) = 1 AND GROUPING(agent) = 1 THEN 'team'
+               WHEN GROUPING(department) = 0 THEN 'team'
                WHEN GROUPING(agent) = 1 THEN 'topic'
                ELSE 'agent'
              END AS "group",
              CASE
-               WHEN GROUPING(topic) = 1 AND GROUPING(agent) = 1 THEN 'IT Support'
+               WHEN GROUPING(department) = 0 THEN COALESCE(department, 'Department not set')
                WHEN GROUPING(agent) = 1 THEN topic
                ELSE agent
              END AS name,
@@ -311,7 +314,7 @@ adminRouter.get("/overview", async (request, response) => {
              ROUND(AVG("responseSeconds") FILTER (WHERE "responseSeconds" IS NOT NULL))::INTEGER
                AS "averageResponseSeconds"
            FROM ticket_metrics
-           GROUP BY scope, GROUPING SETS ((), (topic), (agent))
+           GROUP BY scope, GROUPING SETS ((department), (topic), (agent))
            ORDER BY scope, "group", name`,
           [periodStart, periodEnd],
         ),
