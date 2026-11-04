@@ -1,0 +1,436 @@
+--- PAGE 1 ---
+User Acceptance Testing Form 
+ 
+ 
+IT Ticket and Log System 
+ 
+Shani Nezar & Lia Theunissen 
+ 
+
+
+--- PAGE 2 ---
+Acceptance Form 
+PROJECT DETAILS 
+Project Name: CSIS IT Ticket and Log System 
+Project Manager: Mej Selouna Visser_______________________________ 
+Project Lead: Shani Nezar & Lia Theunissen______________________ 
+ACCEPTANCE DETAILS 
+Acceptance ID: ________________________________________ 
+Requested By: CSIS IT Ticket and Log System Development Team 
+Date Requested: 15 October 2026__________________________ 
+Description: 
+The CSIS IT Ticket and Log System is a web-based application for the NWU Computer Science and Information 
+Systems department. It replaces manual email-based IT reporting with structured fault submission, unique ticket 
+tracking, technician job cards and start/stop time recording. Students and staff can follow requests and exchange 
+comments with technicians. The system provides automated NWU email notifications, escalation records for Central 
+IT, immutable audit history and management reporting. This form records acceptance against the functional and 
+technical specifications. Results, remedial actions and customer approval are completed after testing.  
+ACCEPTANCE CRITERIA 
+
+--- PAGE 3 ---
+Criteria 1: 
+Functional Requirements determined for the CSIS IT 
+Ticket and Log System: 
+• NWU email and password authenticate users and 
+route each role to its dashboard using a secure 
+session; invalid credentials show a clear error. 
+Reporter entry follows approved D01. (F01) 
+• Names, NWU email and assigned roles persist 
+correctly; only authorized administrators can 
+change permissions. (F02) 
+• The structured submission form captures Title, 
+Issue Description, Category, Urgency, Location 
+and Station ID using predefined category and 
+urgency choices, and confirms successful 
+submission. (F03) 
+• Clear validation prevents incomplete or invalid 
+tickets; corrected input is accepted. Record the 
+approved institutional email domains. (F04) 
+• Each ticket has a unique Ticket ID, creation time, 
+correct reporter association and initial state; all 
+fields persist in MongoDB. See D04. (F05) 
+• Priority is saved accurately and organizes the 
+queue so higher urgency work is visible first; 
+hazardous priority is tested separately in T cases. 
+(F06) 
+• Each reporter sees their own requests and status 
+history; another reporter ticket is inaccessible 
+through both UI and API. (F07) 
+• Authorized technicians see the permitted ticket 
+queue, filter by status, inspect history and sort by 
+priority. Cards show Station ID, Priority and time 
+since submission. Labels follow D04. (F08) 
+• The ticket records the technician and claim time, 
+moves to the approved active state and updates 
+the dashboard and history. (F09) 
+• Only approved transitions succeed; the ticket, 
+queue and audit history remain consistent for 
+New/Pending, Assigned, In Progress, Escalated 
+and Resolved as agreed. (F10) 
+• Start and stop timestamps persist, active work 
+changes the state to In Progress, duration is 
+calculated to the second and the displayed total 
+matches MongoDB. (F11) 
+• The total adds both sessions correctly in 
+minutes/hours, persists after reload and has 
+timestamped audit entries for the time records. 
+(F12) 
+Criteria 2: 
+Technical and Non-Functional Requirements determined 
+for the CSIS IT Ticket and Log System: 
+• MongoDB, Express and Node.js implement persistence 
+and backend logic. React SPA in FS versus Vanilla 
+JavaScript in TS is resolved and evidenced under 
+D02. (T01) 
+• Node.js is v20.x or greater; Express.js v4.x baseline is 
+verified; target is Ubuntu Server 22.04 LTS or 
+configured Windows Server with a Node process 
+manager such as PM2. (T02) 
+• The approved CSIS physical/virtual host supports the 
+runtime and persistent ticket/audit storage; data 
+location follows the agreed university boundary and 
+D05. (T03) 
+• Functional parity is recorded for Chrome/Firefox/Edge, 
+with FS Safari coverage; Windows 10/11, macOS 
+and Linux browser access works without client 
+installation. (T04) 
+• Mobile workflows match desktop functionality with 
+readable responsive layouts and touch-friendly 
+controls; FS Android 8.0+ and iOS 11.3+ support is 
+documented or dispositioned. (T05) 
+• Core workflows remain usable on a 2 GB RAM dual-
+core desktop at 720p and a 2 GB quad-core mobile 
+device with a 5-inch display, using keyboard/mouse 
+or touch. Stable LAN, Wi-Fi or approved mobile 
+access and 10/100 campus networking are 
+supported. (T06) 
+• Purple/white branding and typography are consistent; 
+deep purple #4B2C70 primary elements, slate 
+secondary actions and labelled green/amber/red 
+statuses follow the specified design. (T07) 
+• The specified WCAG 2.1 requirements, including 
+contrast and keyboard access, are met; focus and 
+labels support the workflows. Attach the audit scope 
+and findings. (T08) 
+• Labels and errors are understandable; Log New 
+Fault/recent-ticket access, station/priority/time details 
+and lab/category analytics are present. Conceptual 
+layouts are reviewed against approved designs. 
+(T09) 
+• REST methods such as GET, POST and PUT 
+exchange structured JSON between browser and 
+backend; MongoDB storage and outbound Admin 
+metrics follow the specified data flow. (T10) 
+
+--- PAGE 4 ---
+• Claim-to-resolution elapsed time is calculated and 
+saved separately from accumulated active timer 
+time and creation-to-closure turnaround, using 
+approved D06 definitions. (F13) 
+• An empty summary prevents closure; valid 
+resolution records notes and closure time, 
+archives the ticket from active queues and 
+triggers the user notification. (F14) 
+• Status becomes Escalated to NWU IT with reason 
+and traceable administrative hand-off; integration 
+records referrals without requiring write access to 
+central IT databases. (F15) 
+• Messages remain linked to the correct Ticket ID, in 
+time order, with sender identity and timestamp; 
+both permitted parties see the same persisted 
+conversation. (F16) 
+• Each new public comment triggers an alert to the 
+other party with the relevant ticket link and 
+without exposing another ticket conversation. 
+(F17) 
+• Authorized IT staff can read the note; the 
+student/staff reporter cannot view it in the UI, API 
+responses or notification contents. (F18) 
+• Posted communication remains immutable and 
+cannot be deleted; the complete troubleshooting 
+history persists under the approved retention 
+approach D08. (F19) 
+• An automatic receipt contains the unique Ticket ID 
+and submitted summary, reaches the correct 
+NWU inbox and links to the ticket. (F20) 
+• The NWU SMTP service dispatches correctly 
+addressed, template-based updates for all 
+specified events with the right status, dynamic 
+data and direct ticket link. (F21) 
+• Administrators filter historical tickets by date 
+range, technician and hardware/category. Only 
+matching records are returned and supply 
+consistent inputs to reports. (F22) 
+• Admin graphs and tables match the source data, 
+show workload distribution and recurring faults, 
+and use correct time definitions including 
+creation-to-closure turnaround. (F23) 
+• Both report formats contain the selected data and 
+accurate metrics; files are readable and 
+accessible only to the authorized role. (F24) 
+ 
+ 
+• Web traffic uses HTTPS with TLS 1.2 or higher, 
+protecting credentials and ticket data in transit; 
+unencrypted access cannot expose protected data. 
+(T11) 
+• Nodemailer sends notifications through the NWU 
+gateway to @nwu.ac.za or @student.g.nwu.ac.za 
+addresses. Port 587 with STARTTLS is the secure 
+baseline; any port 25 use cited in TS p. 20 requires 
+an approved encrypted relay configuration. (T12) 
+ Email processing does not block application 
+requests and sustained test traffic leaves no 
+unresolved notification backlog. (T13) 
+• Signed JWTs establish identity and role for protected 
+requests; invalid or absent tokens cannot claim, close 
+or alter tickets or audit data. D01 governs reporter 
+entry. (T14) 
+• Management authentication operates using the internal 
+module; no unavailable central Active Directory/SSO 
+API is required for the initial release. Future 
+integrations remain separately scoped. (T15) 
+• Reporters are limited to their own tickets; technicians 
+manage approved workloads; reports/system logs 
+and permission changes are restricted to authorized 
+administrators. Resolve queue scope in D04. (T16) 
+• Stored passwords are salted bcrypt hashes with the 
+configured high work factor; no plaintext credential 
+storage is present. Record configuration evidence 
+without copying secrets. (T17) 
+• Server validation using express-validator prevents 
+NoSQL/injection attacks, XSS script execution and 
+unauthorised database access, including when client 
+validation is bypassed. (T18) 
+• Only the application server IP can connect to 
+MongoDB; direct client or unapproved-host access is 
+denied. (T19) 
+• Personal and operational records have documented 
+encryption and secure handling controls; names and 
+NWU emails support incident resolution. Attach 
+POPIA and university policy review evidence for 
+acceptance. (T20) 
+• Records are archived or anonymised after the 
+academic cycle according to the approved policy, 
+while audit traceability and immutable operational 
+history are handled as agreed in D08. (T21) 
+• Standard input responses and ticket acknowledgement 
+are within 2.0 seconds; record timings, network 
+conditions and any failures. PP page-load checks are 
+also captured. (T22) 
+
+--- PAGE 5 ---
+• Critical actions have actor and timestamp records, 
+every state change exists in audit_logs and each 
+resolved ticket identifies its technician and 
+closure time; records resist modification. (F25) 
+ 
+• Ticket lists, status and public messages update 
+asynchronously without a full page refresh, with 
+near real-time visibility and recorded latency. 
+(F26) 
+• Both user groups complete the full reporting and 
+communication workflow successfully and receive 
+the final resolution update. (F27) 
+• All job card, notification, audit and reporting 
+records agree for the same ticket, with role 
+boundaries maintained throughout. (F28) 
+• Supporting Project Plan Requirements: 
+• Automated API tests have a 100% pass rate and 
+there are zero critical security vulnerabilities; 
+attach the release-specific reports. (P01) 
+• The project-plan sub-2.0-second response target 
+is assessed at the 100-user profile; retain this 
+evidence separately from the TS minimum of 50 
+connections. (P02) 
+• The resolution email dispatches within 2 minutes 
+of the trigger. Record inbox arrival separately so 
+dispatch and delivery are distinguishable. (P03) 
+• The dedicated environment and email relay are 
+provisioned and verified; unresolved 
+dependencies have owners and cannot be 
+recorded as passed without evidence. (P04) 
+• The CSIS Network Administrator receives 
+repository ownership, VM/SSH and MongoDB 
+administrative access through secure channels, 
+environment/IP/connection documentation and 
+user guides. Sponsor reviews deployment and 
+handover evidence. (P05) 
+• A support owner, clear user guide and escalation 
+hand-off exist; the planned automatic legacy-
+mailbox reply directs users to the portal and 
+outstanding project issues have recorded actions. 
+(P06) 
+• Optional and Future Requirements: 
+• The design can be extended to screenshot/log 
+uploads; implemented upload functionality is a 
+future enhancement unless explicitly included in 
+this release. (O01) 
+• At least 50 concurrent connections are supported 
+without data corruption or service decline. Capture 
+response times, error counts and evidence that the 
+notification queue drains. (T23) 
+• The system remains usable without client slowdown or 
+significant lag. Record observed limits and agree a 
+dataset and qualitative acceptance decision where no 
+numeric budget is specified. (T24) 
+• Polling or supported WebSockets promptly refresh both 
+views; one consistent technician assignment is 
+retained and conflicting claims do not overwrite each 
+other silently. (T25) 
+• Measure against the FS target of 99.9% during 
+standard academic hours; record window, downtime 
+and result separately from the technical target until 
+D03 is approved. (T26) 
+• Measure both TS requirements: 98% uptime in that 
+window and no more than 9.5 hours unplanned 
+downtime per semester. Record period and resolve 
+the differing targets under D03. (T27) 
+• All 10 students submit successfully without verbal help 
+and each submission takes less than 60 seconds; 
+attach participant timing evidence. (T28) 
+• Physical-risk tickets receive Critical/Hazardous priority 
+and a prominent red labelled alert for immediate 
+attention; no actual hazardous equipment is needed 
+for testing. (T29) 
+• Technicians and management can identify repeated 
+location-specific failures for investigation, including 
+potential overheating/cooling patterns. (T30) 
+• Transactional handling restores the last known good 
+state or a fully committed update; no partial or lost 
+hazard ticket remains. (T31) 
+• At the predetermined interval the Lab Manager 
+receives the escalation notification. Thirty minutes is 
+an example in TS, not a fixed threshold until 
+approved. (T32) 
+approved NWU laboratory safety reminders, including 
+power-down guidance. Digital records show reported 
+hazards and actions for institutional safety review and 
+OHSA evidence. (T33) 
+• MongoDB backups run automatically and successfully 
+at least once per 24-hour window; evidence identifies 
+the latest recoverable backup. (T34) 
+• The database returns to its last known good backed-up 
+state within 2 hours, with ticket, user, time-log and 
+audit integrity verified. (T35) 
+
+--- PAGE 6 ---
+• Offline access is optional/future scope; record 
+implementation evidence or an approved N/A 
+disposition without making it a current mandatory 
+gate. (O02) 
+• The optional printed output is readable through 
+standard OS/browser printing; otherwise record 
+approved N/A. (O03) 
+• Future Outlook/calendar and full central-system 
+integration remain separately approved work; 
+initial escalation record and local management 
+login remain testable without them. (O04) 
+• Baseline Decisions Before Sign-off: 
+• D01: Confirm mandatory reporter login versus 
+NWU-email submission without account creation. 
+• D02: Confirm React MERN frontend versus the 
+Vanilla JavaScript frontend stated in the technical 
+specification. 
+• D03: Approve the uptime target, operating 
+calendar and measurement period; both source 
+targets remain listed. 
+• D04: Agree New/Pending and Assigned/In 
+Progress transitions, escalation labels and 
+technician queue permissions. 
+• D05: Confirm internal hosting and the university 
+data-location boundary versus the cloud option 
+mentioned in TS. 
+• D06: Keep active work time, claim-to-resolution 
+elapsed time and creation-to-closure turnaround 
+distinct. 
+• D07: Record both the 50-connection technical 
+minimum and the 100-user project-plan 
+performance profile. 
+• D08: Agree how post-2026 archiving or 
+anonymization preserves approved immutable 
+audit history. 
+• D09: Approve Critical/Hazardous priority, the 
+hazard escalation timeout and Lab Manager 
+recipient. 
+ 
+• Every endpoint has JSDoc or Swagger documentation; 
+ESLint or equivalent reports no critical style 
+violations. snake_case data names and PascalCase 
+modules follow TS conventions or documented 
+exceptions. (T36) 
+• The maintainer can run the application in less than 20 
+minutes using the README; commented modular 
+code supports future maintenance and deployment to 
+other departments. (T37) 
+• A downloadable PDF quick-start guide, login-page FAQ 
+and user/technician/Admin manuals cover 
+access/login and password recovery, submission, 
+categories, ticket status, timers, secure comments, 
+reports, user roles and troubleshooting. (T38)  
+• Hardware-fault submission displays  Architecture, ERD, 
+state transitions, wireframes, schemas, server 
+deployment, SMTP setup and failure troubleshooting 
+are available, current and professionally typed; 
+external references follow NWU Harvard style. (T39) 
+ Source and technical documents are version 
+controlled, secure SSH/HTTPS supports repository 
+access and the documented update process delivers 
+the approved release to the departmental server. (T40) 
+ The release uses approved free/open-source tooling 
+and university resources with zero new licensing costs; 
+initial launch is restricted to CSIS labs/offices within the 
+2026 scope. (T41) 
+ 
+
+--- PAGE 7 ---
+ 
+ACCEPTANCE RESULTS 
+Testing methods used: 
+Reviewer for undertaking the UAT: ___________________________ 
+Date the test was completed: ______________________________ 
+Overall results: Not assessed 
+Total: ______    Passed: ______    Failed: ______    Blocked / Not run: ______ 
+Remedial Action Required: 
+ 
+Acceptance Reviewer Date Result 
+Criteria 1: Functional 
+Specification. 
+Refer to requirements F01 
+to F28 stated above. 
+   
+Criteria 2: Technical 
+Specification. 
+Refer to requirements T01 
+to T41 stated above. 
+   
+ 
+CUSTOMER APPROVAL 
+Supporting Documentation: 
+CSIS IT Ticket Log System Functional Specification v1.0.2 
+CSIS IT Ticket Log System Technical Specification v1.0.1 
+IT Ticket and Log System Project Plan and completed UAT evidence 
+Signature: _______________________       Date: ____________________ 
+
+--- PAGE 8 ---
+ 
+SUPPORTING ACCEPTANCE RECORD 
+Project Team: Shani Nezar and Lia Theunissen 
+Project Sponsor: Selouna Visser 
+Release or Build: ________________________________________ 
+Environment and URL: ________________________________________ 
+Acceptance Decision: Not assessed 
+Evidence and defect record location: 
+____________________________________________________________________ 
+Conditions of acceptance and approved baseline decisions: 
+____________________________________________________________________ 
+Execution and review: 
+Use an agreed test environment and record actual results and evidence against the F, T, P and O identifiers. 
+F01-F28 are functional criteria; T01-T41 are technical criteria; P01-P06 are supporting project-plan checks; 
+O01-O04 are optional or future scope. Record Pass, Fail, Blocked or approved N/A for each executed check in 
+the linked evidence record. Summarize the outcomes on the acceptance results page. Leave unexecuted 
+checks as Not run. Technical reviewers supply API, security, performance and recovery evidence. Record defect 
+owners, remedial actions and retest outcomes before customer approval. 
+Source references: 
+ 
+ 

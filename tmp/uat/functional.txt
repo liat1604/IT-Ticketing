@@ -1,0 +1,675 @@
+=== PAGE 1 ===
+ 
+1
+ 
+SOFTWARE FUNCTIONAL SPECIFICATIONS 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+IT Ticket and Log System 
+ 
+Shani Nezar & Lia Theunissen  
+ 
+2026/05/11 
+ 
+Version 1.0.2 
+VERSION HISTORY 
+VERSION APPROVED BY REVISION DATE DESCRIPTION OF CHANGE AUTHOR 
+0.1  06/05/2026 Looked at the layout and added content C Theunissen 
+1.0   07/05/2026 Changed and revised content C Theunissen 
+1.0.1  08/05/2026 Added tables and more content C Theunissen 
+1.0.2  09/05/2026 Finalized content C Theunissen 
+     
+     
+     
+ 
+
+
+=== PAGE 2 ===
+ 
+2
+Functional Specifications Document 
+Authorization Memorandum 
+ 
+I have carefully assessed the Functional Specifications Document for the IT Ticket & Log System. 
+ 
+MANAGEMENT CERTIFICATION - Please check the appropriate statement. 
+ 
+______ The document is accepted.  
+ 
+______ The document is accepted pending the changes noted. 
+ 
+______ The document is not accepted. 
+ 
+We fully accept the changes as needed improvements and authorize initiation of work to proceed.  
+Based on our authority and judgment, the continued operation of this system is authorized. 
+Selouna Visser 11/05/2026 
+_______________________________ _____________________ 
+NAME   DATE 
+Project Sponsor 
+ 
+_______________________________ _____________________ 
+NAME  DATE 
+Project Manager 
+ 
+_______________________________ _____________________ 
+NAME   DATE 
+Director 
+ 
+ 
+
+=== PAGE 3 ===
+ 
+3
+ 
+1 INTRODUCTION ............................................................................................................................ 5 
+1.1 Purpose ........................................................................................................................................ 5 
+1.2 Reference Documents ............................................................................................................... 5 
+1.3 Abbreviations and Acronyms .................................................................................................... 5 
+1.4 Document Conventions ............................................................................................................. 5 
+2 GENERAL DESCRIPTION ................................................................................................................ 6 
+2.1 Product Context .......................................................................................................................... 6 
+2.2 User Classes and Characteristics ............................................................................................... 6 
+2.3 Overview of Functional Requirements ...................................................................................... 6 
+2.4 Overview of Data Requirements ............................................................................................... 6 
+2.5 Operating Environment .............................................................................................................. 7 
+2.6 General Constraints, Assumptions, Dependencies, Guidelines .............................................. 8 
+2.7 Design and Implementation Constraints ................................................................................... 8 
+2.8 User Documentation ................................................................................................................... 9 
+3 REQUIREMENTS ........................................................................................................................... 10 
+3.1 External Interface Requirements .............................................................................................. 10 
+3.1.1 User Interfaces ................................................................................................................... 10 
+3.1.2 Hardware Interfaces ......................................................................................................... 10 
+3.1.3 Software Interfaces ........................................................................................................... 10 
+3.1.4 Communications Interfaces ............................................................................................. 11 
+3.2 Functional Requirements .......................................................................................................... 11 
+3.2.1 Template for functional requirements ............................................................................. 11 
+3.3 Performance Requirements ..................................................................................................... 13 
+
+=== PAGE 4 ===
+ 
+4
+3.4 Security ....................................................................................................................................... 13 
+3.5 Usability ...................................................................................................................................... 13 
+3.6 Other Requirements .................................................................................................................. 13 
+Appendix A. Analysis Models ......................................................................................................... 15 
+Appendix B. Issues List ..................................................................................................................... 16 
+ 
+
+=== PAGE 5 ===
+ 
+5
+1 INTRODUCTION 
+Provide an overview of the entire Functional Specifications Document, including the purpose, 
+scope, definitions, acronyms, abbreviations, references, etc.  
+1.1 Purpose 
+The purpose of this document is to detail the functional and non-functional requirements for the custom 
+Integrated IT Ticketing and Log System. This system aims to replace the current manual, email-oriented 
+support model with a centralized, web-based platform to improve traceability and efficiency. 
+1.2 Reference Documents 
+ Business Case: CSIS IT Ticket Log System – Business Case.  
+ Feasibility Study: CSIS IT Ticket Log System – Feasibility Study. 
+1.3 Abbreviations and Acronyms 
+ CSIS: Computer Science and Information Systems.  
+ POPIA: Protection of Personal Information Act.  
+ MERN: MongoDB, Express.js, React, Node.js.  
+ COTS: Commercial Off-The-Shelf. 
+1.4 Document Conventions 
+Structural Conventions 
+ Heading Styles: Used to define different levels of hierarchy within the document context. All major 
+sections are numbered to allow for easy reference and cross-linking throughout the document. 
+ Numbered Lists: Serve to display sequential steps, specific orders, or to illustrate the sequential flow 
+of processes within the system.  
+ Bulleted Lists: Utilized to present groups of related items, choices, or system features.  
+ Tables: Used for presenting data in a structured and clear manner, allowing for easier contrasting 
+and analysis of the presented information (such as outlining functional requirements or issue lists).  
+Formatting and Typographical Conventions 
+ Bold Text: Used for critical system features, requirements, headings, sub-headings, or terms that 
+require special attention.  
+ Italic Text: Used for general notes, user instructions, or emphasis.  
+Naming conventions 
+ User Roles: User types interacting with the system—such as Technician, Student, Staff, and 
+Admin—are always capitalized to distinguish them as specific system roles.  
+Variables and Database Fields:  
+ Code-related terms and database entities (e.g., ticket_id, user_role) are written to align with 
+MongoDB and JavaScript (MERN stack) naming practices, ensuring consistency between the 
+documentation and the final technical implementation. 
+
+=== PAGE 6 ===
+ 
+6
+2 GENERAL DESCRIPTION 
+2.1 Product Context 
+Currently, the IT ticketing procedure within the CSIS department relies on inefficient, manual emails, 
+leading to a lack of central records, overlooked requests, and poor visibility into ticket statuses and 
+technician workloads. The proposed system is a custom-built, web-based application utilizing the 
+MERN stack (MongoDB, Express.js, React, Node.js). It functions within the university's secure IT 
+ecosystem to consolidate support requests, automate email notifications, and track technician time 
+via digital "job cards". 
+2.2 User Classes and Characteristics 
+Primary Users (IT Staff/Technicians):  
+ Characteristics: High technical proficiency. High mobility across multiple floors and academic 
+departments. Time-constrained. 
+ Needs: Require a mobile-responsive interface for real-time updates on the go. Need digital "job 
+cards" with start/stop time tracking to accurately log work duration. Require clear queues of 
+prioritized tickets to manage workloads effectively. 
+Secondary Users (Students and Staff):  
+ Characteristics: Varying levels of technical proficiency. Accustomed to the informal nature of 
+sending emails for support. 
+ Needs: Require a simple, intuitive interface free of technical jargon. Expect automated transparency 
+(knowing exactly what stage their ticket is in). Need automated email confirmations and resolutions. 
+Administrators / Management (CSIS IT Supervisors): 
+ Characteristics: Focus on operational efficiency, resource allocation, and service delivery metrics. 
+ Needs: Require visual dashboards and reporting analytics to track workload trends, average 
+turnaround times, and common recurring IT issues.  
+2.3 Overview of Functional Requirements 
+The system must provide an end-to-end platform for ticket management. Core functionalities include:  
+ User & Role Management: Secure login and profile management ensuring users are directed to 
+the correct interfaces based on their role (Student/Staff vs. Technician vs. Admin). 
+ Structured Ticket Logging: Users can submit detailed IT requests utilizing predefined categories 
+(e.g., Hardware, Software, Network) and urgency levels to ensure accurate routing. 
+ Unique Traceability: The system automatically generates a unique Ticket ID for every request, 
+creating a permanent audit trail. 
+ Lifecycle Management: Tickets are systematically tracked through distinct lifecycle states (e.g., 
+"New," "Assigned," "In Progress," and "Resolved"). 
+ Technician Job Cards: A dedicated dashboard view for IT staff featuring start/stop timer 
+functionality to accurately track task duration and manage active workloads. 
+ Centralized Communication: Integrated comment-based messaging within each ticket to 
+centralize dialogue, completely replacing fragmented email threads. 
+ Automated Notifications: The system will automatically trigger and route confirmation, status 
+update, and resolution emails to the relevant users. 
+ Reporting & Dashboards: Automated aggregation of system data to provide administrators with 
+visual metrics on department performance, turnaround times, and technician workloads. 
+
+=== PAGE 7 ===
+ 
+7
+2.4 Overview of Data Requirements 
+To support the functional requirements, the system must securely process and store several distinct data 
+entities: 
+ Ticket Data: Storage of unique Ticket IDs, timestamps (creation, updates, closure), issue descriptions, 
+predefined categories, and priority levels. 
+ User Information: Collection of student/staff names, NWU email addresses, and assigned system 
+roles (User, Technician, Admin) for authentication and notification routing. 
+ Operational & Workflow Data: Storage of job card durations (start/stop timestamps), internal 
+technician notes, and complete status history logs for auditability. 
+ Communication Logs: Sequential storage of user and technician comments linked to specific Ticket 
+IDs. 
+ Performance Metrics: Aggregated data points used for calculating average response times, resolution 
+rates, and workload distribution for management reporting. 
+ Compliance: All personal and operational data must be encrypted and handled securely to ensure 
+strict compliance with the Protection of Personal Information Act (POPIA) and university data 
+governance policies. 
+2.5 Operating Environment 
+The CSIS IT Ticket Log System is designed as a responsive, cross-platform web application. Because it is 
+web-based, it requires no local installation and can be accessed from any internet-enabled device, ensuring 
+maximum accessibility for students, staff, and highly mobile IT technicians. 
+Target Platforms and Browsers 
+ Operating Systems: Fully compatible with Windows (10/11), macOS, and Linux for desktop users. 
+Mobile access is supported on Android (8.0+) and iOS (11.3+). 
+ Supported Browsers: The system is optimized for modern web browsers, including Google Chrome, 
+Mozilla Firefox, Microsoft Edge, and Apple Safari. 
+Hardware Requirements 
+To ensure a smooth user experience—especially for the real-time job card tracking—the following minimum 
+specifications are suggested: 
+Feature Desktop / Laptop (Students, Staff, Admins) Mobile / Tablet (IT Technicians) 
+RAM Minimum 2GB Minimum 2GB 
+Processor Modern dual-core processor (e.g., Intel i3, AMD 
+Ryzen) 
+Standard Quad-core mobile CPU 
+Display 720p minimum; 1080p recommended for Admin 
+Dashboards 
+Responsive scaling suitable for 5-inch 
+screens and up 
+Network Stable LAN or Wi-Fi connection Stable Wi-Fi or 4G/LTE mobile data 
+ 
+Server & Infrastructure 
+ Hosting: The system will be hosted internally on existing CSIS department on-premise servers. 
+ Software Stack: Built utilizing the MERN stack. The server environment will require a Node.js runtime 
+and a localized MongoDB database instance to ensure data does not leave the university network. 
+ Integrations: Requires access to the NWU SMTP relay server to push confirmation and notification 
+emails to users automatically 
+ 
+
+=== PAGE 8 ===
+ 
+8
+2.6 General Constraints, Assumptions, Dependencies, Guidelines 
+ Constraints: Development is restricted to internal student resources to ensure zero licensing costs. The 
+solution must adhere strictly to university data security and POPIA policies.  
+ Assumptions: It is assumed that all users have consistent access to web browsers and active university 
+email accounts.  
+ Dependencies: Successful implementation depends on the availability of internal server space and 
+database access from CSIS administrators.  
+ Guidelines: The project will follow an iterative delivery approach using sprints to manage development 
+risks.  
+2.7 Design and Implementation Constraints 
+This section outlines the overarching project boundaries, expectations, and foundational elements guiding 
+the development and delivery of the system. 
+Constraints 
+ Budget Limitations: Development is strictly restricted to internal student resources. The solution must 
+utilize open-source frameworks (like React and Node.js) to ensure zero licensing costs. 
+ Time Constraints: The system must be developed, tested, and operational by the beginning of the 
+second semester to support the 2026 academic cycle. 
+ Compliance & Security: The solution must adhere strictly to the Protection of Personal Information 
+Act (POPIA) and university data security policies 
+Assumptions 
+ Access: It is assumed that all target users have consistent access to a web browser, a stable internet 
+connection, and an active NWU email account. 
+ Digital Literacy: Most users (staff and students) are assumed to possess basic digital literacy and will 
+comfortably navigate a standard web form. 
+ Infrastructure Stability: It is assumed that the existing NWU email infrastructure is reliable and 
+capable of handling the automated system notifications. 
+Dependencies 
+ Infrastructure Provisioning: Successful implementation is entirely dependent on the timely allocation 
+of internal server space and MongoDB database access by the CSIS network administrators. 
+ Escalation Workflows: The system's effectiveness relies on coordinating with the main NWU IT 
+Department to establish clear technical or procedural hand-offs for escalated tickets. 
+ SMTP Access: The notification system depends on the university granting the application permission 
+to route emails through its servers. 
+Guidelines 
+ Development Methodology: The project will follow an Agile/iterative delivery approach using defined 
+sprints. This allows for continuous testing and user feedback to manage development risks. 
+ User-Centric Design: The interface must prioritize mobile-first design for the technician views, 
+acknowledging that IT staff operate across multiple floors and departments. 
+ Long-Term Maintainability: Because the developers are students who will eventually graduate, the 
+code must be heavily commented, properly version-controlled (e.g., via GitHub), and accompanied by 
+comprehensive handover documentation. 
+
+=== PAGE 9 ===
+ 
+9
+2.8 User Documentation 
+To support successful adoption, smooth onboarding, and long-term sustainability of the CSIS IT Ticket Log 
+System, we will provide comprehensive documentation. The documentation is tailored to the specific 
+technical proficiencies of each user class. 
+End-User Guides (Students and Staff) 
+ Objective: To assist users in transitioning away from the legacy email-based support model to the new 
+centralized web portal, minimizing resistance to change. 
+ Content: Clear, simple, and highly visual step-by-step instructions. It will cover how to navigate to the 
+portal, log a new ticket, categorize an issue, and interpret the automated status emails. 
+ Delivery: A brief, downloadable PDF quick-start guide, supplemented by an accessible web-based 
+FAQ section directly on the ticketing portal login page. 
+Technician and Administrator Manuals 
+ Objective: To train IT staff on managing their active workloads and utilizing the system’s advanced 
+tracking features. 
+ Content: Detailed workflows covering how to filter ticket queues, properly utilize the "Job Card" 
+start/stop timers for time tracking, communicate securely within the ticket thread, and generate 
+departmental performance analytics. 
+Technical Maintenance & Handover Documentation 
+ Objective: To guarantee long-term system sustainability. Because the system is developed by 
+students who will eventually graduate, seamless knowledge transfer is critical. 
+ Content: Comprehensive technical documentation detailing the MERN stack architecture, server 
+deployment procedures, MongoDB database schemas, and SMTP email integration protocols. It will 
+include troubleshooting guides for common server or database failures. 
+Documentation Standardization 
+ Formatting: To ensure consistency and academic professionalism, all project-related documentation, 
+technical manuals, and user guides will be professionally typed. 
+ Referencing: All external resources, legal guidelines (such as POPIA), and technical dependencies 
+referenced within the documentation will strictly adhere to the NWU Harvard referencing style. 
+Proposed Structure for the Comprehensive User Manual: 
+1) Introduction & System Overview (Purpose and Roles) 
+2) Getting Started (URL access, Login, and Password Recovery) 
+3) End-User Guide 
+a) Submitting a Support Request 
+b) Viewing Active Tickets and Providing Additional Info 
+4) Technician Guide 
+a) Managing the Ticket Queue 
+b) Using the Job Card (Time Tracking) 
+c) Resolving and Closing Tickets 
+5) Administrator Guide 
+a) Generating Performance Reports 
+b) User and Role Management 
+6) Technical Maintenance Appendix (Server, Database, and Codebase Guidelines) 
+7) Troubleshooting & FAQs 
+
+=== PAGE 10 ===
+ 
+10
+3 REQUIREMENTS 
+ 
+3.1. External Interface Requirements 
+The system is designed to operate as a standalone web application within the CSIS department's 
+ecosystem. It requires seamless interaction with users across various devices, as well as reliable 
+connections to underlying databases and institutional communication networks. 
+User Interfaces 
+The system’s front-end will be built using React to provide a dynamic, single-page application experience. 
+The interface must cater to the distinct needs of students, staff, and IT technicians. 
+Interface 
+Name 
+Description Key Features 
+Web Portal 
+(Global) 
+The responsive, primary gateway to the 
+system, accessible via desktop and 
+mobile browsers. 
+Secure login screen, role-based redirection, and global 
+navigation menu. 
+Submission 
+Form 
+The structured intake form utilized by 
+students and staff to log IT support 
+requests. 
+Dropdown menus for categories/urgency levels, text 
+fields for descriptions, and a submit button. 
+Technician 
+Dashboard 
+A specialized workspace for IT staff to 
+manage their assigned ticket queues. 
+Features the digital "Job Card" view with prominently 
+displayed start/stop buttons for real-time tracking, and a 
+ticket comment thread. 
+Admin 
+Analytics 
+Panel 
+A reporting interface for CSIS 
+supervisors to monitor operational 
+efficiency. 
+Visual graphs and tables displaying turnaround times, 
+workload distribution, and system health. 
+ 
+Hardware Interfaces 
+As a web-based platform, the software does not require proprietary client hardware, but it must be fully 
+optimized for the standard hardware used across the university campus. 
+ Mobile Devices (Touchscreens): The system interface must be fully functional and easily navigable on 
+mobile hardware (smartphones and tablets). This is critical to support technician mobility, allowing them 
+to start/stop job cards and update tickets while physically moving across different floors and 
+departments. 
+ Desktop & Laptop Peripherals: Standard Human Interface Devices (HID), such as keyboards and 
+mice, are required for students and staff to input detailed ticket descriptions, and for administrators to 
+navigate complex analytics reports. 
+ On-Premise Servers: The application backend will interface directly with the existing physical CSIS 
+departmental servers allocated for hosting the application files and running the database engine. 
+ 
+Software Interfaces 
+The application relies on specific software components and integrations to process data and execute 
+automated tasks. 
+Software Interface Description & Interaction 
+MongoDB 
+(Database) 
+The NoSQL database operating as the "M" in the MERN stack. It handles the persistent 
+storage, retrieval, and updating of all ticket records, user profiles, and time-log data. 
+Node.js / 
+Express.js API 
+The backend framework that processes requests from the React frontend, executes business 
+logic (like calculating job card durations), and interacts with the MongoDB database. 
+
+=== PAGE 11 ===
+ 
+11
+NWU Email 
+Infrastructure 
+The external software service utilized to dispatch automated notifications. The system will 
+interface with the university's email servers to trigger confirmations, status updates, and 
+resolution alerts to users. 
+ 
+Communications Interfaces 
+All data exchange between the client, server, and external integrations will occur over standardized, secure 
+protocols. 
+ HTTPS (Hypertext Transfer Protocol Secure): All communication between the user's web browser 
+(frontend) and the Node.js backend server will be encrypted via HTTPS to protect sensitive user 
+credentials and ticket data in transit. 
+ SMTP (Simple Mail Transfer Protocol): The backend server will utilize SMTP as the dedicated 
+interface for securely routing and sending automated notification emails to user and staff inboxes via the 
+university's mail relay. 
+3.2. Functional Requirements 
+ 
+Detailed Functional Specifications 
+ 
+User Authentication and Role Routing 
+Criteria Specification 
+Purpose / 
+Description 
+Securely authenticate users into the system and route them to the appropriate dashboard 
+based on their assigned system role. 
+Inputs User credentials (NWU email address, password). 
+Processing The system verifies the credentials against the user database. Upon success, it queries the 
+user's role (Student/Staff, Technician, or Admin) and establishes a secure session token. 
+Outputs Successful login redirects the user to their specific UI dashboard. Unsuccessful login 
+displays a clear error message (e.g., "Invalid credentials"). 
+ 
+ 
+Structured Ticket Logging (Creation) 
+ 
+Criteria Specification 
+Purpose / 
+Description 
+Allow students and staff to submit structured, easily classifiable IT support requests. 
+Inputs User selections from predefined dropdowns (Category, Urgency) and text input (Title, Issue 
+Description). 
+Processing The backend validates all mandatory fields. It generates a Unique Ticket ID, captures the 
+exact creation timestamp, associates the ticket with the logged-in user ID, and sets the 
+initial state to "New". 
+Outputs A new ticket record is written to the database. The user sees a "Ticket Submitted 
+Successfully" UI confirmation, and an automated trigger is fired to the email module. 
+ 
+Technician Job Cards (Time Tracking) 
+Criteria Specification 
+Purpose / 
+Description 
+Enable technicians to accurately track and log the duration of active work on a specific 
+ticket. 
+
+=== PAGE 12 ===
+ 
+12
+Inputs Technician clicks the "Start Timer" button and subsequently the "Stop Timer" button on the 
+ticket interface. 
+Processing The system captures the "Start" timestamp. Upon clicking "Stop," it captures the second 
+timestamp, calculates the exact duration (in minutes/hours), and sums this with any 
+previously logged time on that ticket. It automatically shifts the ticket status to "In Progress". 
+Outputs The updated total work duration is saved to the database and visually updated on the ticket 
+UI. A time-log audit entry is created. 
+ 
+Centralized Ticket Communication 
+Criteria Specification 
+Purpose / 
+Description 
+Consolidate all dialogue regarding a specific issue directly within the ticket to replace 
+fragmented email chains. 
+Inputs User or Technician types a message into the ticket's comment box and clicks "Send". 
+Processing The system validates the text input, appends the sender's ID and current timestamp, and 
+pushes the data to the ticket's internal comment array in the database. It triggers a 
+notification event. 
+Outputs The new message instantly appears in the ticket's chronologically ordered chat thread. An 
+email alert is dispatched to the opposing party. 
+ 
+Ticket Lifecycle Management (Resolution) 
+Criteria Specification 
+Purpose / 
+Description 
+Provide a structured method for advancing tickets from active states to completion. 
+Inputs Technician selects "Resolved" from the status dropdown and inputs a mandatory 
+"Resolution Summary" comment. 
+Processing The system validates that a resolution summary exists. It updates the ticket state to 
+"Resolved," captures the exact closure timestamp, and calculates the total turnaround time 
+(Creation Timestamp vs. Closure Timestamp). 
+Outputs The ticket is moved from active queues to the archived/resolved queue. An automated email 
+is sent to the user notifying them of the resolution. 
+ 
+Automated Email Notifications 
+Criteria Specification 
+Purpose / 
+Description 
+Keep all parties informed of ticket status changes in real-time without requiring manual 
+follow-ups. 
+Inputs Internal system triggers (e.g., Ticket Created, Status Changed, New Comment Added). 
+Processing The system intercepts the trigger, pulls the relevant Ticket ID data, formats a standardized 
+HTML email template with the dynamic data, and routes it to the NWU SMTP server. 
+Outputs An email is successfully dispatched to the target user's NWU inbox containing the update 
+and a direct link back to the ticket in the web portal. 
+ 
+Admin Reporting & Dashboards 
+Criteria Specification 
+Purpose / 
+Description 
+Provide CSIS management with visual metrics to track departmental performance, 
+workload distribution, and resolution times. 
+Inputs Administrator selects a specific date range and metric filter (e.g., "Average Turnaround 
+Time" or "Tickets by Category"). 
+
+=== PAGE 13 ===
+ 
+13
+Processing The system queries the database for all tickets falling within the parameters, 
+aggregates the time logs and categorical data, and calculates the requested averages 
+or totals. 
+Outputs Real-time visual graphs (pie charts, line graphs) are rendered on the Admin UI. 
+Provides an option to output/download this data as a CSV or PDF report. 
+ 
+3.1 Performance Requirements 
+ Response Time: The system must provide near real-time updates for status changes and messaging. 
+The UI should respond to standard user inputs (such as submitting a ticket or starting a timer) within 
+2.0 seconds under normal network conditions. 
+ Availability & Uptime: High availability is required to ensure technicians can log walk-in issues and 
+update job cards while on-site. The system targets a 99.9% uptime during standard academic hours.  
+ Throughput: The platform must be capable of handling high volumes of concurrent users—specifically 
+during peak academic periods—without experiencing data corruption or significant lag. 
+ 
+3.2 Security 
+ POPIA Compliance: The system must ensure secure, structured data handling in accordance with the 
+Protection of Personal Information Act. Sensitive data must be encrypted in transit using HTTPS/TLS 
+protocols.  
+ Role-Based Access Control (RBAC): Secure authentication must enforce strict boundaries. Students 
+can only access their own requests, technicians can manage their assigned workloads, and admins 
+retain global oversight to protect sensitive ticket data.  
+ Audit Logging: All critical actions—such as login attempts, status changes, and time entries—must be 
+permanently logged with timestamps to ensure complete accountability and traceability. 
+ 
+3.3 Usability 
+ Branding & Trust: The interface should be strictly branded to match official university standards, 
+fostering immediate user trust and encouraging widespread adoption.  
+ Simplicity & Frictionless Adoption: The user guide and portal design must be highly intuitive. By 
+keeping the "Submit Ticket" process simple, the system will easily overcome potential user resistance 
+to moving away from familiar email habits.  
+ Mobile-First Technician View: Because IT staff are highly mobile, all critical technician interfaces (like 
+the Job Card timer) must feature touch-friendly targets optimized for smaller mobile screens. 
+ Error Prevention: Forms must utilize predefined dropdowns and forced categorical selections to 
+prevent invalid data entry and reduce frustration. 
+3.4 Other Requirements 
+ Scalability: The system architecture must remain modular. While initially designed for CSIS, the 
+foundational codebase should allow for potential seamless deployment in other academic departments 
+across NWU.  
+ Maintenance & Sustainability: To mitigate the risk of knowledge loss when the initial student 
+developers graduate, heavily commented code and comprehensive maintenance manuals must be 
+provided to ensure new staff can easily take over the application's upkeep.  
+
+=== PAGE 14 ===
+ 
+14
+ Offline Resilience (Optional/Future-Proofing): The system should be built with service workers in 
+mind to potentially cache recent data, allowing technicians to view their queues even during brief 
+campus connectivity outages. 
+ 
+  
+ 
+
+=== PAGE 15 ===
+ 
+15
+Appendix A.  Analysis Models 
+ 
+List any attached / referenced documentation such as data flow diagrams, class diagrams, state-transition 
+diagrams, entity-relationship diagrams, etc.  
+ 
+ANALYSIS MODELS 
+DOCUMENT NAME DESCRIPTION LOCATION 
+System Architecture Diagram A high-level visual representation of the 
+MERN stack (MongoDB, Express, React, 
+Node.js) interacting with the CSIS on-
+premise servers and the NWU SMTP email 
+infrastructure. 
+Project Repository 
+Entity-Relationship Diagram (ERD) A database model illustrating the 
+collections and relationships between 
+Users, Tickets, Comments, and Time_Logs 
+within MongoDB. 
+Project Repository 
+State-Transition Diagram A flow chart mapping the strict lifecycle of 
+a ticket, showing how it moves from "New" 
+to "In Progress" to "Resolved" based on user 
+and technician triggers. 
+Project Repository 
+UI Wireframes Low-fidelity visual mockups of the Student 
+Submission Form, the Technician "Job Card" 
+Dashboard, and the Admin Analytics 
+Panel. 
+Project Repository 
+ 
+
+=== PAGE 16 ===
+ 
+16
+Appendix B.  Issues List 
+ 
+Detail any unresolved issues. 
+ 
+Issue 
+ID 
+Issue Description Status / Actions Required to Resolve 
+ISS-
+01 
+Development Time Allocation: Internal CSIS 
+developers and IT personnel must juggle 
+this project with their regular support 
+responsibilities. 
+Open: Establish a rigorous project timetable 
+and set aside specific development time 
+each week to guarantee consistent 
+progress without exhausting the team. 
+ISS-
+02 
+Infrastructure Setup: The system requires a 
+dedicated internal server to be provisioned 
+and configured before deployment. 
+Open: Log a formal request with the NWU IT 
+Department or CSIS network administrators 
+to allocate server space and database 
+access. 
+ISS-
+03 
+NWU IT Escalation Workflow: There is 
+currently no clear technical or procedural 
+hand-off procedure for escalating tickets 
+to the main NWU IT Department. 
+Open: Set up a meeting with a member of 
+the NWU IT Department to decide how data 
+should be formatted and transferred when 
+a ticket is escalated. 
+ISS-
+04 
+User Adoption (Change Management): 
+Students and staff are accustomed to 
+sending emails, and there may be initial 
+resistance to using a new online form. 
+Pending: Create a clear, simple user guide 
+and implement an automatic email reply 
+on the old IT support email address, 
+directing users to the new web portal. 
+ISS-
+05 
+MFA Integration Risks: Existing data security 
+protocols (MFA) will cause issues with 
+possible future Outlook calendar 
+integration. 
+Open: Investigate workaround protocols or 
+service accounts with central IT to 
+accommodate future integrations. 
+ISS-
+06 
+Project Sustainability: Students graduate 
+and the long-term sustainability including 
+handover documentation of work is 
+potentially lacking. 
+Pending: Ensure comprehensive 
+maintenance manuals and codebase 
+documentation are finalized before the 
+project concludes. 
+ 
+  
+ 

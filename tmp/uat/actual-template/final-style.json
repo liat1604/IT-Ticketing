@@ -1,0 +1,170 @@
+{
+  "input": "C:\\Users\\CSIS_PostGrad\\Documents\\GitHub\\IT-Ticketing\\output\\doc\\CSIS_IT_Ticket_Log_System_UAT_Actual_Form.docx",
+  "fonts_by_char_count": {
+    "Arial": 35405
+  },
+  "direct_run_formatting_runs": 701,
+  "direct_paragraph_formatting_paragraphs": 264,
+  "heading_like_paragraphs_not_heading_style": [
+    {
+      "para_index": 9,
+      "text": "IT Ticket and Log System",
+      "style": "Normal"
+    },
+    {
+      "para_index": 11,
+      "text": "Shani Nezar & Lia Theunissen",
+      "style": "Normal"
+    },
+    {
+      "para_index": 13,
+      "text": "ITRI 624",
+      "style": "Normal"
+    },
+    {
+      "para_index": 19,
+      "text": "PROJECT DETAILS\u00a9",
+      "style": "Body Text"
+    },
+    {
+      "para_index": 20,
+      "text": "PROJECT DETAILS\u00a9",
+      "style": "Body Text"
+    },
+    {
+      "para_index": 21,
+      "text": "Project Name: CSIS IT Ticket and Log System",
+      "style": "Body Text"
+    },
+    {
+      "para_index": 24,
+      "text": "Project Manager: Mej Selouna Visser",
+      "style": "Body Text"
+    },
+    {
+      "para_index": 27,
+      "text": "Project Lead: Shani Nezar & Lia Theunissen",
+      "style": "Body Text"
+    },
+    {
+      "para_index": 29,
+      "text": "Project Name: CSIS IT Ticket and Log System",
+      "style": "Body Text"
+    },
+    {
+      "para_index": 32,
+      "text": "Project Manager: Mej Selouna Visser",
+      "style": "Body Text"
+    },
+    {
+      "para_index": 35,
+      "text": "Project Lead: Shani Nezar & Lia Theunissen",
+      "style": "Body Text"
+    },
+    {
+      "para_index": 37,
+      "text": "ACCEPTANCE DETAILS",
+      "style": "Body Text"
+    },
+    {
+      "para_index": 38,
+      "text": "ACCEPTANCE DETAILS",
+      "style": "Body Text"
+    },
+    {
+      "para_index": 39,
+      "text": "Acceptance ID: (N/A)",
+      "style": "Normal"
+    },
+    {
+      "para_index": 41,
+      "text": "Requested By: CSIS IT Ticket and Log System Development Team",
+      "style": "Normal"
+    },
+    {
+      "para_index": 44,
+      "text": "Date Requested: 15 October 2026",
+      "style": "Normal"
+    },
+    {
+      "para_index": 46,
+      "text": "Acceptance ID: (N/A)",
+      "style": "Normal"
+    },
+    {
+      "para_index": 48,
+      "text": "Requested By: CSIS IT Ticket and Log System Development Team",
+      "style": "Normal"
+    },
+    {
+      "para_index": 51,
+      "text": "Date Requested: 15 October 2026",
+      "style": "Normal"
+    },
+    {
+      "para_index": 57,
+      "text": "ACCEPTANCE CRITERIA",
+      "style": "Body Text"
+    }
+  ],
+  "examples": {
+    "direct_run_formatting": [
+      {
+        "para_index": 2,
+        "run_text": "User ",
+        "style": "Subtitle"
+      },
+      {
+        "para_index": 2,
+        "run_text": "Acceptance ",
+        "style": "Subtitle"
+      },
+      {
+        "para_index": 2,
+        "run_text": "Testing ",
+        "style": "Subtitle"
+      },
+      {
+        "para_index": 2,
+        "run_text": "Form",
+        "style": "Subtitle"
+      },
+      {
+        "para_index": 2,
+        "run_text": "\u00a9",
+        "style": "Subtitle"
+      }
+    ],
+    "direct_paragraph_formatting": [
+      {
+        "para_index": 19,
+        "text": "PROJECT DETAILS\u00a9",
+        "style": "Body Text"
+      },
+      {
+        "para_index": 20,
+        "text": "PROJECT DETAILS\u00a9",
+        "style": "Body Text"
+      },
+      {
+        "para_index": 21,
+        "text": "Project Name: CSIS IT Ticket and Log System",
+        "style": "Body Text"
+      },
+      {
+        "para_index": 22,
+        "text": "____________________________________________________________",
+        "style": "Body Text"
+      },
+      {
+        "para_index": 23,
+        "text": "",
+        "style": "Body Text"
+      }
+    ]
+  },
+  "notes": [
+    "Direct formatting is not always wrong, but it often causes inconsistent output when templates change.",
+    "Heading-like paragraphs not using Heading styles can break TOC and accessibility."
+  ]
+}

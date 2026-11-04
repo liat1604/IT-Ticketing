@@ -1,0 +1,170 @@
+{
+  "input": "C:\\Users\\CSIS_PostGrad\\Documents\\GitHub\\IT-Ticketing\\tmp\\uat\\actual-template\\reference.docx",
+  "fonts_by_char_count": {
+    "Arial": 5389
+  },
+  "direct_run_formatting_runs": 216,
+  "direct_paragraph_formatting_paragraphs": 16,
+  "heading_like_paragraphs_not_heading_style": [
+    {
+      "para_index": 9,
+      "text": "IT Ticket and Log System",
+      "style": "Normal"
+    },
+    {
+      "para_index": 11,
+      "text": "Shani Nezar & Lia Theunissen",
+      "style": "Normal"
+    },
+    {
+      "para_index": 13,
+      "text": "ITRI 624",
+      "style": "Normal"
+    },
+    {
+      "para_index": 19,
+      "text": "PROJECT DETAILS\u00a9",
+      "style": "Body Text"
+    },
+    {
+      "para_index": 20,
+      "text": "PROJECT DETAILS\u00a9",
+      "style": "Body Text"
+    },
+    {
+      "para_index": 22,
+      "text": "Project Name: \t\tCSIS IT Ticket and Log System",
+      "style": "Body Text"
+    },
+    {
+      "para_index": 23,
+      "text": "\t\t\t___________________________________________________",
+      "style": "Body Text"
+    },
+    {
+      "para_index": 25,
+      "text": "Project Manager: \u00a9 \tMej Selouna Visser",
+      "style": "Normal"
+    },
+    {
+      "para_index": 28,
+      "text": "Project Lead: \t\tShani Nezar & Lia Theunissen",
+      "style": "Normal"
+    },
+    {
+      "para_index": 32,
+      "text": "Project Name: \t\tCSIS IT Ticket and Log System",
+      "style": "Body Text"
+    },
+    {
+      "para_index": 33,
+      "text": "\t\t\t___________________________________________________",
+      "style": "Body Text"
+    },
+    {
+      "para_index": 35,
+      "text": "Project Manager: \u00a9 \tMej Selouna Visser",
+      "style": "Normal"
+    },
+    {
+      "para_index": 38,
+      "text": "Project Lead: \t\tShani Nezar & Lia Theunissen",
+      "style": "Normal"
+    },
+    {
+      "para_index": 41,
+      "text": "ACCEPTANCE DETAILS",
+      "style": "Body Text"
+    },
+    {
+      "para_index": 42,
+      "text": "ACCEPTANCE DETAILS",
+      "style": "Body Text"
+    },
+    {
+      "para_index": 75,
+      "text": "ACCEPTANCE CRITERIA",
+      "style": "Body Text"
+    },
+    {
+      "para_index": 76,
+      "text": "ACCEPTANCE CRITERIA",
+      "style": "Body Text"
+    },
+    {
+      "para_index": 84,
+      "text": "ACCEPTANCE RESULTS\u00a9",
+      "style": "Body Text"
+    },
+    {
+      "para_index": 85,
+      "text": "ACCEPTANCE RESULTS\u00a9",
+      "style": "Body Text"
+    },
+    {
+      "para_index": 126,
+      "text": "CUSTOMER APPROVAL",
+      "style": "Body Text"
+    }
+  ],
+  "examples": {
+    "direct_run_formatting": [
+      {
+        "para_index": 2,
+        "run_text": "User ",
+        "style": "Subtitle"
+      },
+      {
+        "para_index": 2,
+        "run_text": "Acceptance ",
+        "style": "Subtitle"
+      },
+      {
+        "para_index": 2,
+        "run_text": "Testing ",
+        "style": "Subtitle"
+      },
+      {
+        "para_index": 2,
+        "run_text": "Form",
+        "style": "Subtitle"
+      },
+      {
+        "para_index": 2,
+        "run_text": "\u00a9",
+        "style": "Subtitle"
+      }
+    ],
+    "direct_paragraph_formatting": [
+      {
+        "para_index": 19,
+        "text": "PROJECT DETAILS\u00a9",
+        "style": "Body Text"
+      },
+      {
+        "para_index": 20,
+        "text": "PROJECT DETAILS\u00a9",
+        "style": "Body Text"
+      },
+      {
+        "para_index": 41,
+        "text": "ACCEPTANCE DETAILS",
+        "style": "Body Text"
+      },
+      {
+        "para_index": 42,
+        "text": "ACCEPTANCE DETAILS",
+        "style": "Body Text"
+      },
+      {
+        "para_index": 75,
+        "text": "ACCEPTANCE CRITERIA",
+        "style": "Body Text"
+      }
+    ]
+  },
+  "notes": [
+    "Direct formatting is not always wrong, but it often causes inconsistent output when templates change.",
+    "Heading-like paragraphs not using Heading styles can break TOC and accessibility."
+  ]
+}
